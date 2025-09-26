@@ -1,0 +1,112 @@
+version: '3.8'
+
+services:
+  # Frontend Next.js
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+      - NEXT_PUBLIC_API_URL=http://localhost:3001
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    depends_on:
+      - backend
+    networks:
+      - volleycoaching-network
+
+  # Backend API (Node.js/Express + Prisma)
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=development
+      - DATABASE_URL=postgresql://volleyuser:volleypass@postgres:5432/volleycoaching
+      - JWT_SECRET=your-super-secret-jwt-key
+      - REDIS_URL=redis://redis:6379
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - volleycoaching-network
+
+  # Base de données PostgreSQL
+  postgres:
+    image: postgres:15-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_DB=volleycoaching
+      - POSTGRES_USER=volleyuser
+      - POSTGRES_PASSWORD=volleypass
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/init:/docker-entrypoint-initdb.d
+    networks:
+      - volleycoaching-network
+
+  # Redis pour le cache et les sessions temps réel
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - volleycoaching-network
+
+  # Service de stockage des médias (MinIO - alternative S3)
+  minio:
+    image: minio/minio:latest
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      - MINIO_ROOT_USER=volleyadmin
+      - MINIO_ROOT_PASSWORD=volleypass123
+    volumes:
+      - minio_data:/data
+    command: server /data --console-address ":9001"
+    networks:
+      - volleycoaching-network
+
+  # Service d'analyse vidéo (Python/FastAPI pour l'IA)
+  video-service:
+    build:
+      context: ./services/video-analysis
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://volleyuser:volleypass@postgres:5432/volleycoaching
+      - REDIS_URL=redis://redis:6379
+      - MINIO_ENDPOINT=minio:9000
+      - MINIO_ACCESS_KEY=volleyadmin
+      - MINIO_SECRET_KEY=volleypass123
+    volumes:
+      - ./services/video-analysis:/app
+    depends_on:
+      - postgres
+      - redis
+      - minio
+    networks:
+      - volleycoaching-network
+
+volumes:
+  postgres_data:
+  redis_data:
+  minio_data:
+
+networks:
+  volleycoaching-network:
+    driver: bridge
