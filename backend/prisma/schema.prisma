@@ -10,257 +10,568 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ============================================
+// AUTHENTICATION & ORGANIZATION
+// ============================================
+
 model User {
-  id          String   @id @default(cuid())
-  email       String   @unique
-  username    String   @unique
-  firstName   String
-  lastName    String
-  role        Role     @default(COACH)
-  avatar      String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  // Relations
-  teams       Team[]
-  trainings   Training[]
-  exercises   Exercise[]
-
-  @@map("users")
-}
-
-model Team {
-  id          String   @id @default(cuid())
-  name        String
-  description String?
-  avatar      String?
-  coachId     String
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  // Relations
-  coach       User       @relation(fields: [coachId], references: [id])
-  players     Player[]
-  trainings   Training[]
-  tactics     Tactic[]
-
-  @@map("teams")
-}
-
-model Player {
-  id              String   @id @default(cuid())
-  firstName       String
-  lastName        String
-  jerseyNumber    Int
-  position        Position
-  avatar          String?
-  teamId          String
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-
-  // Relations
-  team            Team              @relation(fields: [teamId], references: [id])
-  stats           PlayerStat[]
-  trainingPlayers TrainingPlayer[]
-  tacticPlayers   TacticPlayer[]
-  assessments     PlayerAssessment[]
-
-  @@unique([teamId, jerseyNumber])
-  @@map("players")
-}
-
-model PlayerStat {
   id        String   @id @default(cuid())
-  playerId  String
-  statType  StatType
-  value     Float
+  email     String   @unique
+  username  String   @unique
+  password  String
+  firstName String
+  lastName  String
+  role      Role     @default(COACH)
+  avatar    String?
+  orgId     String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   // Relations
-  player    Player @relation(fields: [playerId], references: [id])
+  organization         Organization          @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  teams                Team[]
+  trainingSessions     TrainingSession[]
+  exercises            Exercise[]
+  evaluations          Evaluation[]
+  evaluationSessions   EvaluationSession[]
+  developmentPlans     DevelopmentPlan[]
 
-  @@unique([playerId, statType])
-  @@map("player_stats")
+  @@index([orgId])
+  @@index([email])
+  @@map("users")
 }
 
-model PlayerAssessment {
-  id          String   @id @default(cuid())
-  playerId    String
-  strengths   String[] // Points forts
-  weaknesses  String[] // Points faibles
-  notes       String?
-  overallRating Int    @default(0) // Note globale sur 100
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+model Organization {
+  id        String   @id @default(cuid())
+  name      String
+  type      OrgType  @default(CLUB)
+  country   String?
+  logo      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relations
-  player      Player @relation(fields: [playerId], references: [id])
+  users   User[]
+  teams   Team[]
+  players Player[]
 
-  @@map("player_assessments")
+  @@map("organizations")
 }
 
-model Training {
-  id          String   @id @default(cuid())
+// ============================================
+// TEAMS & PLAYERS
+// ============================================
+
+model Team {
+  id          String    @id @default(cuid())
   name        String
   description String?
-  duration    Int      // en minutes
-  difficulty  Int      @default(1) // 1-5
+  level       TeamLevel @default(SENIOR)
+  season      String? // "2024-2025"
+  avatar      String?
   coachId     String
-  teamId      String?
-  scheduledAt DateTime?
+  orgId       String
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // Relations
+  coach            User              @relation(fields: [coachId], references: [id])
+  organization     Organization      @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  players          Player[]
+  trainingSessions TrainingSession[]
+  lineups          Lineup[]
+
+  @@index([coachId])
+  @@index([orgId])
+  @@map("teams")
+}
+
+model Lineup {
+  id          String   @id @default(cuid())
+  teamId      String
+  name        String   @default("Default Lineup")
+  isActive    Boolean  @default(true) // Current active lineup
+  positions   Json     // Store lineup positions as JSON
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   // Relations
-  coach           User              @relation(fields: [coachId], references: [id])
-  team            Team?             @relation(fields: [teamId], references: [id])
-  exercises       TrainingExercise[]
-  trainingPlayers TrainingPlayer[]
+  team        Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
 
-  @@map("trainings")
+  @@index([teamId])
+  @@index([isActive])
+  @@map("lineups")
 }
 
-model TrainingPlayer {
-  id         String @id @default(cuid())
-  trainingId String
-  playerId   String
+model Player {
+  id                String         @id @default(cuid())
+  // Personal Info
+  firstName         String
+  lastName          String
+  preferredName     String?
+  dateOfBirth       DateTime
+  nationality       String
+  email             String?
+  phone             String?
+  avatar            String?
+  jerseyNumber      Int
+  // Volleyball Info
+  primaryPosition   Position
+  secondaryPosition Position?
+  dominantHand      String         @default("right") // "right", "left", "ambidextrous"
+  yearsOfExperience Int            @default(0)
+  // Physical Measurements
+  height            Float? // cm
+  weight            Float? // kg
+  armReach          Float? // cm
+  wingspan          Float? // cm
+  // Status & Contract
+  status            PlayerStatus   @default(ACTIVE)
+  contractLevel     ContractLevel  @default(TRIAL)
+  joinDate          DateTime       @default(now())
+
+  // ✨ CURRENT STATS (Single Source of Truth)
+  currentRating     Float?         // Overall rating (evolves over time)
+  potentialRating   Float?         // Potential rating
+  currentTechnical  Json?          // Current technical skills (TechnicalSkills type)
+  currentPhysical   Json?          // Current physical attributes (PhysicalAttributes type)
+  currentMental     Json?          // Current mental attributes (MentalAttributes type)
+  strengths         String[]       @default([]) // Current strengths
+  weaknesses        String[]       @default([]) // Current improvement areas
+  lastEvaluationDate DateTime?     // Date of last evaluation that updated stats
+  statsUpdatedAt    DateTime?      // Last time stats were updated
 
   // Relations
-  training   Training @relation(fields: [trainingId], references: [id])
-  player     Player   @relation(fields: [playerId], references: [id])
+  teamId            String
+  orgId             String
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
 
-  @@unique([trainingId, playerId])
-  @@map("training_players")
+  // Relations
+  team                 Team                   @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  organization         Organization           @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  evaluations          Evaluation[]
+  evaluationSessions   EvaluationSession[]
+  trainingAttendances  TrainingAttendance[]
+  performanceMetrics   PerformanceMetric[]
+  developmentPlans     DevelopmentPlan[]
+
+  @@unique([teamId, jerseyNumber])
+  @@index([teamId])
+  @@index([orgId])
+  @@index([status])
+  @@map("players")
 }
 
-model Exercise {
+// ============================================
+// EVALUATIONS
+// ============================================
+
+model Evaluation {
+  id                String   @id @default(cuid())
+  playerId          String
+  evaluatorId       String // User who conducted the evaluation
+  evaluationDate    DateTime @default(now())
+
+  // Overall Ratings
+  overallRating     Float // 0-10
+  potentialRating   Float // 0-10
+
+  // Detailed Skills (stored as JSON for flexibility)
+  technical         Json // TechnicalSkills type
+  physical          Json // PhysicalAttributes type
+  mental            Json // MentalAttributes type
+
+  // Analysis
+  strengths         String[] // Array of strength descriptions
+  improvementAreas  String[] // Array of areas to improve
+  notes             String?  @db.Text
+
+  // Metadata
+  isCurrent         Boolean  @default(false) // Only one evaluation should be current per player
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  // Relations
+  player            Player   @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  evaluator         User     @relation(fields: [evaluatorId], references: [id])
+
+  @@index([playerId])
+  @@index([evaluatorId])
+  @@index([isCurrent])
+  @@map("evaluations")
+}
+
+model EvaluationSession {
+  id               String            @id @default(cuid())
+  playerId         String
+  evaluatorId      String
+  batteryName      String // "Complete Assessment", "Physical Only", etc.
+  status           SessionStatus     @default(IN_PROGRESS)
+  startedAt        DateTime          @default(now())
+  completedAt      DateTime?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+
+  // Relations
+  player           Player            @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  evaluator        User              @relation(fields: [evaluatorId], references: [id])
+  tests            EvaluationTest[]
+
+  @@index([playerId])
+  @@index([evaluatorId])
+  @@index([status])
+  @@map("evaluation_sessions")
+}
+
+model EvaluationTest {
   id               String   @id @default(cuid())
-  name             String
-  description      String?
-  videoUrl         String?
-  instagramUrl     String?
-  duration         Int      // en minutes
-  difficulty       Int      @default(1) // 1-5
-  minPlayers       Int      @default(1)
-  maxPlayers       Int      @default(12)
-  targetStats      StatType[] // Stats améliorées
-  equipment        String[] // Matériel nécessaire
-  reward           String?  // Contrat si réussite
-  penalty          String?  // Malus si échec
-  createdById      String
+  sessionId        String
+  testId           String // "vertical_jump", "sprint", "serving_accuracy", etc.
+  category         TestCategory
+
+  // Test Results (flexible JSON to accommodate different test types)
+  results          Json
+
+  // Metadata
+  completedAt      DateTime @default(now())
+  notes            String?  @db.Text
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
   // Relations
-  createdBy        User               @relation(fields: [createdById], references: [id])
-  trainingExercises TrainingExercise[]
+  session          EvaluationSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 
+  @@unique([sessionId, testId])
+  @@index([sessionId])
+  @@index([category])
+  @@map("evaluation_tests")
+}
+
+// ============================================
+// EXERCISE LIBRARY
+// ============================================
+
+model Exercise {
+  id               String            @id @default(cuid())
+  name             String
+  description      String            @db.Text
+  instructions     String?           @db.Text
+
+  // Media
+  videoUrl         String?
+  thumbnailUrl     String?
+  instagramUrl     String?
+
+  // Exercise Properties
+  category         ExerciseCategory
+  difficulty       ExerciseDifficulty
+  intensity        ExerciseIntensity
+  duration         Int // minutes
+  minPlayers       Int               @default(1)
+  maxPlayers       Int               @default(12)
+
+  // Equipment & Setup
+  equipment        String[] // Array of equipment names
+  spaceRequired    String? // "Half court", "Full court", "Small area"
+
+  // Skills Targeted
+  targetSkills     String[] // ["serving", "passing", "blocking"]
+  primaryFocus     String? // Main skill being trained
+
+  // Ownership & Customization
+  isBaseExercise   Boolean           @default(false) // True for the 30 default exercises
+  createdById      String
+  orgId            String? // Null for base exercises, set for org-specific ones
+
+  // Metadata
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+
+  // Relations
+  createdBy        User              @relation(fields: [createdById], references: [id])
+  tags             ExerciseTagRelation[]
+  trainingExercises TrainingSessionExercise[]
+
+  @@index([createdById])
+  @@index([orgId])
+  @@index([category])
+  @@index([difficulty])
+  @@index([isBaseExercise])
   @@map("exercises")
 }
 
-model TrainingExercise {
-  id         String @id @default(cuid())
-  trainingId String
+model ExerciseTag {
+  id        String   @id @default(cuid())
+  name      String
+  color     String? // Hex color for UI
+  orgId     String? // Null for system tags, set for org-specific tags
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  exercises ExerciseTagRelation[]
+
+  @@unique([name, orgId])
+  @@index([orgId])
+  @@map("exercise_tags")
+}
+
+model ExerciseTagRelation {
+  id         String   @id @default(cuid())
   exerciseId String
-  order      Int    @default(0)
+  tagId      String
+  createdAt  DateTime @default(now())
 
   // Relations
-  training   Training @relation(fields: [trainingId], references: [id])
-  exercise   Exercise @relation(fields: [exerciseId], references: [id])
+  exercise   Exercise     @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
+  tag        ExerciseTag  @relation(fields: [tagId], references: [id], onDelete: Cascade)
 
-  @@unique([trainingId, exerciseId])
-  @@map("training_exercises")
+  @@unique([exerciseId, tagId])
+  @@index([exerciseId])
+  @@index([tagId])
+  @@map("exercise_tag_relations")
 }
 
-model Tactic {
-  id          String   @id @default(cuid())
-  name        String
-  description String?
-  teamId      String
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+// ============================================
+// TRAINING SESSIONS
+// ============================================
+
+model TrainingSession {
+  id               String            @id @default(cuid())
+  name             String
+  description      String?           @db.Text
+
+  // Session Details
+  totalDuration    Int // minutes
+  difficulty       ExerciseDifficulty
+  intensity        ExerciseIntensity
+
+  // Structure
+  includeWarmup    Boolean           @default(true)
+  includeStretching Boolean          @default(true)
+  includeGame      Boolean           @default(true)
 
   // Relations
-  team        Team           @relation(fields: [teamId], references: [id])
-  phases      TacticPhase[]
+  coachId          String
+  teamId           String?
 
-  @@map("tactics")
-}
+  // Scheduling
+  scheduledAt      DateTime?
+  completedAt      DateTime?
+  status           SessionStatus     @default(PLANNED)
 
-model TacticPhase {
-  id          String   @id @default(cuid())
-  tacticId    String
-  name        String
-  order       Int      @default(0)
-  duration    Int?     // en secondes
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  // Metadata
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
 
   // Relations
-  tactic      Tactic         @relation(fields: [tacticId], references: [id])
-  players     TacticPlayer[]
-  movements   PlayerMovement[]
+  coach            User                      @relation(fields: [coachId], references: [id])
+  team             Team?                     @relation(fields: [teamId], references: [id], onDelete: SetNull)
+  exercises        TrainingSessionExercise[]
+  attendances      TrainingAttendance[]
 
-  @@map("tactic_phases")
+  @@index([coachId])
+  @@index([teamId])
+  @@index([scheduledAt])
+  @@index([status])
+  @@map("training_sessions")
 }
 
-model TacticPlayer {
-  id        String @id @default(cuid())
-  phaseId   String
-  playerId  String
-  startX    Float  @default(0)
-  startY    Float  @default(0)
+model TrainingSessionExercise {
+  id         String   @id @default(cuid())
+  sessionId  String
+  exerciseId String
+  order      Int // Position in the session
+  duration   Int? // Override duration if different from exercise default
+  notes      String?  @db.Text
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
   // Relations
-  phase     TacticPhase @relation(fields: [phaseId], references: [id])
-  player    Player      @relation(fields: [playerId], references: [id])
+  session    TrainingSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  exercise   Exercise        @relation(fields: [exerciseId], references: [id])
 
-  @@unique([phaseId, playerId])
-  @@map("tactic_players")
+  @@unique([sessionId, order])
+  @@index([sessionId])
+  @@index([exerciseId])
+  @@map("training_session_exercises")
 }
 
-model PlayerMovement {
-  id        String @id @default(cuid())
-  phaseId   String
-  playerId  String
-  fromX     Float
-  fromY     Float
-  toX       Float
-  toY       Float
-  timestamp Int    @default(0) // en millisecondes depuis le début de la phase
+model TrainingAttendance {
+  id         String   @id @default(cuid())
+  sessionId  String
+  playerId   String
+  attended   Boolean  @default(false)
+  notes      String?  @db.Text
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
   // Relations
-  phase     TacticPhase @relation(fields: [phaseId], references: [id])
+  session    TrainingSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  player     Player          @relation(fields: [playerId], references: [id], onDelete: Cascade)
 
-  @@map("player_movements")
+  @@unique([sessionId, playerId])
+  @@index([sessionId])
+  @@index([playerId])
+  @@map("training_attendances")
 }
+
+// ============================================
+// PERFORMANCE TRACKING
+// ============================================
+
+model PerformanceMetric {
+  id         String       @id @default(cuid())
+  playerId   String
+  metricType MetricType
+  value      Float
+  unit       String // "cm", "seconds", "kg", etc.
+  recordedAt DateTime     @default(now())
+  notes      String?      @db.Text
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+
+  // Relations
+  player     Player       @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  @@index([playerId])
+  @@index([metricType])
+  @@index([recordedAt])
+  @@map("performance_metrics")
+}
+
+model DevelopmentPlan {
+  id               String   @id @default(cuid())
+  playerId         String
+  createdById      String
+
+  // Goals
+  objectives       String[] // Array of objectives
+  focusAreas       String[] // Areas to focus on
+
+  // Timeline
+  startDate        DateTime @default(now())
+  targetDate       DateTime?
+
+  // Progress
+  status           PlanStatus @default(ACTIVE)
+  progressNotes    String?    @db.Text
+
+  // Metadata
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  // Relations
+  player           Player   @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  createdBy        User     @relation(fields: [createdById], references: [id])
+
+  @@index([playerId])
+  @@index([createdById])
+  @@index([status])
+  @@map("development_plans")
+}
+
+// ============================================
+// ENUMS
+// ============================================
 
 enum Role {
+  ADMIN
   COACH
   ASSISTANT_COACH
   PLAYER
-  ADMIN
+}
+
+enum OrgType {
+  CLUB
+  SCHOOL
+  FEDERATION
+  ACADEMY
+}
+
+enum TeamLevel {
+  YOUTH // U12, U14
+  JUNIOR // U16, U18
+  SENIOR // U21+
+  PROFESSIONAL
 }
 
 enum Position {
-  SETTER         // Passeur
+  SETTER // Passeur
   OUTSIDE_HITTER // Attaquant de pointe
   MIDDLE_BLOCKER // Central
-  OPPOSITE       // Attaquant diagonal
-  LIBERO         // Libéro
+  OPPOSITE // Attaquant diagonal
+  LIBERO // Libéro
   DEFENSIVE_SPECIALIST // Spécialiste défensif
 }
 
-enum StatType {
-  SERVE_ACCURACY      // Précision du service
-  SPIKE_POWER         // Puissance d'attaque
-  BLOCKING_HEIGHT     // Hauteur de contre
-  RECEPTION_QUALITY   // Qualité de réception
-  SETTING_ACCURACY    // Précision de passe
-  DIGGING_SKILL       // Compétence en défense
-  ENDURANCE          // Endurance
-  AGILITY            // Agilité
-  JUMPING_HEIGHT     // Hauteur de saut
-  REACTION_TIME      // Temps de réaction
+enum PlayerStatus {
+  ACTIVE
+  INJURED
+  SUSPENDED
+  INACTIVE
+}
+
+enum ContractLevel {
+  TRIAL // Essai
+  DEVELOPMENT // Développement
+  ROTATION // Rotation
+  STARTER // Titulaire
+}
+
+enum SessionStatus {
+  PLANNED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum TestCategory {
+  PHYSICAL
+  TECHNICAL
+  MENTAL
+}
+
+enum ExerciseCategory {
+  WARMUP
+  TECHNICAL_DRILL
+  TACTICAL_DRILL
+  PHYSICAL_CONDITIONING
+  GAME_SITUATION
+  COOL_DOWN
+  STRETCHING
+}
+
+enum ExerciseDifficulty {
+  BEGINNER
+  INTERMEDIATE
+  ADVANCED
+  EXPERT
+}
+
+enum ExerciseIntensity {
+  LIGHT
+  MODERATE
+  HIGH
+}
+
+enum MetricType {
+  VERTICAL_JUMP
+  APPROACH_JUMP
+  SPRINT_10M
+  SPRINT_20M
+  AGILITY_T_TEST
+  ENDURANCE_VO2MAX
+  SERVE_VELOCITY
+  SPIKE_VELOCITY
+  BLOCK_HEIGHT
+  WEIGHT
+  BODY_FAT_PERCENTAGE
+}
+
+enum PlanStatus {
+  ACTIVE
+  COMPLETED
+  CANCELLED
 }
