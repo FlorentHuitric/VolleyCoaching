@@ -1,44 +1,77 @@
-version: '3.8'
-
 services:
+  # Nginx Reverse Proxy
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - frontend
+      - backend
+      - adminer
+      - minio
+    networks:
+      - volleycoaching-network
+    restart: unless-stopped
+
   # Frontend Next.js
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-    ports:
-      - "3000:3000"
+    expose:
+      - "3000"
     environment:
       - NODE_ENV=development
-      - NEXT_PUBLIC_API_URL=http://localhost:3001
+      - NEXT_PUBLIC_API_URL=http://api.localhost
+      - NEXT_PUBLIC_GRAPHQL_URL=http://api.localhost/graphql
     volumes:
       - ./frontend:/app
       - /app/node_modules
+      - /app/.next
     depends_on:
       - backend
     networks:
       - volleycoaching-network
+    restart: unless-stopped
 
-  # Backend API (Node.js/Express + Prisma)
+  # Backend API (Node.js/Express + Apollo GraphQL + Prisma)
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
+    expose:
+      - "3001"
     ports:
       - "3001:3001"
+      - "5555:5555"  # Prisma Studio
     environment:
       - NODE_ENV=development
       - DATABASE_URL=postgresql://volleyuser:volleypass@postgres:5432/volleycoaching
-      - JWT_SECRET=your-super-secret-jwt-key
+      - JWT_ACCESS_SECRET=zOurPfmdaii2M5G7xD6720ez/9Zp9xzffkkSzvRpcQmy6jq7KKdZXdZJhLP+h15JqIp/h4hl67S1DGq2Oy6+Tg==
+      - JWT_REFRESH_SECRET=/1VsxWMNqy8U+L4avKQeQE7Y05Nt1wQ2YFpxVOzqydVPc5M8wSG14m2+zBI70k3qprJbW/z9U009WYfMeJUdRg==
       - REDIS_URL=redis://redis:6379
+      - FRONTEND_URL=http://localhost
+      - SEED_DB=false
+      - MINIO_ENDPOINT=minio:9000
+      - MINIO_ACCESS_KEY=volleyadmin
+      - MINIO_SECRET_KEY=volleypass123
+      - MINIO_PUBLIC_URL=http://storage.localhost
+      - FACEBOOK_OEMBED_TOKEN=
     volumes:
       - ./backend:/app
       - /app/node_modules
     depends_on:
-      - postgres
-      - redis
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      minio:
+        condition: service_started
     networks:
       - volleycoaching-network
+    restart: unless-stopped
 
   # Base de données PostgreSQL
   postgres:
@@ -54,6 +87,26 @@ services:
       - ./database/init:/docker-entrypoint-initdb.d
     networks:
       - volleycoaching-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U volleyuser -d volleycoaching"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # Adminer - Database Management UI
+  adminer:
+    image: adminer:latest
+    expose:
+      - "8080"
+    environment:
+      - ADMINER_DEFAULT_SERVER=postgres
+      - ADMINER_DESIGN=nette
+    depends_on:
+      - postgres
+    networks:
+      - volleycoaching-network
+    restart: unless-stopped
 
   # Redis pour le cache et les sessions temps réel
   redis:
@@ -80,32 +133,49 @@ services:
     networks:
       - volleycoaching-network
 
-  # Service d'analyse vidéo (Python/FastAPI pour l'IA)
-  video-service:
-    build:
-      context: ./services/video-analysis
-      dockerfile: Dockerfile
-    ports:
-      - "8000:8000"
-    environment:
-      - DATABASE_URL=postgresql://volleyuser:volleypass@postgres:5432/volleycoaching
-      - REDIS_URL=redis://redis:6379
-      - MINIO_ENDPOINT=minio:9000
-      - MINIO_ACCESS_KEY=volleyadmin
-      - MINIO_SECRET_KEY=volleypass123
-    volumes:
-      - ./services/video-analysis:/app
-    depends_on:
-      - postgres
-      - redis
-      - minio
-    networks:
-      - volleycoaching-network
+  # Service d'analyse vidéo (Python/FastAPI pour l'IA) - DISABLED FOR NOW
+  # video-service:
+  #   build:
+  #     context: ./services/video-analysis
+  #     dockerfile: Dockerfile
+  #   ports:
+  #     - "8000:8000"
+  #   environment:
+  #     - DATABASE_URL=postgresql://volleyuser:volleypass@postgres:5432/volleycoaching
+  #     - REDIS_URL=redis://redis:6379
+  #     - MINIO_ENDPOINT=minio:9000
+  #     - MINIO_ACCESS_KEY=volleyadmin
+  #     - MINIO_SECRET_KEY=volleypass123
+  #   volumes:
+  #     - ./services/video-analysis:/app
+  #   depends_on:
+  #     - postgres
+  #     - redis
+  #     - minio
+  #   networks:
+  #     - volleycoaching-network
 
+# ============================================
+# VOLUMES - Persistent Data Storage
+# ============================================
+# Ces volumes sont nommés et gérés par Docker.
+# Ils persistent même après 'docker-compose down' ou 'docker system prune'.
+# Pour les supprimer, il faut explicitement utiliser 'docker volume rm' ou 'docker system prune --volumes'.
+#
+# Localisation des données:
+# - Linux/WSL2: /var/lib/docker/volumes/volleycoaching_postgres_data/_data
+# - Windows Docker Desktop: \\wsl$\docker-desktop-data\version-pack-data\community\docker\volumes\
+#
+# Sauvegarde recommandée:
+# docker exec volleycoaching-postgres-1 pg_dump -U volleyuser volleycoaching > backup.sql
+# ============================================
 volumes:
   postgres_data:
+    name: volleycoaching_postgres_data
   redis_data:
+    name: volleycoaching_redis_data
   minio_data:
+    name: volleycoaching_minio_data
 
 networks:
   volleycoaching-network:

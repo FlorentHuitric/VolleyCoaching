@@ -52,10 +52,8 @@ coverage/
 # Stores VSCode versions used for testing VSCode extensions
 .vscode-test
 
-# Docker volumes
-postgres_data/
-redis_data/
-minio_data/
+# Docker persistent data - DO NOT COMMIT
+data/
 
 # IDE
 .vscode/
@@ -89,3 +87,9 @@ backend/prisma/migrations/
 # Temporary files
 *.tmp
 *.temp
+
+# MCP config (local tool config)
+.mcp.json
+
+# Generated GraphQL schema
+backend/schema.gql
