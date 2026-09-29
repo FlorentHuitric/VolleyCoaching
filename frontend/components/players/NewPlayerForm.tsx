@@ -83,7 +83,7 @@ const contractLevels = [
 export default function NewPlayerForm() {
   const router = useRouter();
   const { currentTeamId } = useTeam();
-  
+
   // Apollo Client mutations and queries
   const [createPlayerMutation] = useMutation(CREATE_PLAYER);
   const { data: playersData } = useQuery(GET_PLAYERS_BY_TEAM, {
@@ -96,7 +96,7 @@ export default function NewPlayerForm() {
   });
   const allPlayers = playersData?.playersByTeam || [];
   const currentTeamOrgId = teamData?.team?.orgId;
-  
+
   const [calendarMonth, setCalendarMonth] = useState<Date>(new Date(2000, 0));
   const [cropDialogOpen, setCropDialogOpen] = useState(false);
   const [tempImageUrl, setTempImageUrl] = useState<string>('');
@@ -168,8 +168,8 @@ export default function NewPlayerForm() {
 
     try {
       // Validate orgId is available
-      if (!currentTeamOrgId) {
-        throw new Error('Organization ID not found. Please refresh the page.');
+      if (!currentTeamOrgId || !currentTeamId) {
+        throw new Error('Sélectionnez une équipe avant d’ajouter un joueur.');
       }
 
       // Create player via GraphQL mutation
@@ -177,7 +177,7 @@ export default function NewPlayerForm() {
         variables: {
           input: {
             orgId: currentTeamOrgId,
-            teamId: formData.teamId,
+            teamId: currentTeamId,
             firstName: formData.firstName,
             lastName: formData.lastName,
             preferredName: formData.preferredName || null,
@@ -188,6 +188,13 @@ export default function NewPlayerForm() {
             jerseyNumber: formData.jerseyNumber,
             avatar: formData.avatar || null,
             height: formData.height,
+            armReach: formData.reach,
+            wingspan: formData.wingspan,
+            experienceLevel: formData.experience || null,
+            notes: formData.notes || null,
+            medicalNotes: formData.medicalNotes || null,
+            emergencyContact: formData.emergencyContact || null,
+            emergencyPhone: formData.emergencyPhone || null,
             weight: formData.weight,
             dominantHand: formData.dominantHand,
             primaryPosition: formData.primaryPosition.toUpperCase().replace(/ /g, '_'),
@@ -223,9 +230,10 @@ export default function NewPlayerForm() {
     uploadFormData.append('file', croppedImageBlob, 'avatar.jpg');
 
     try {
-      const response = await fetch('http://api.localhost/upload', {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/upload`, {
         method: 'POST',
         body: uploadFormData,
+        headers: { Authorization: `Bearer ${localStorage.getItem('volleycoaching_access_token') || ''}` },
       });
 
       if (response.ok) {
@@ -260,7 +268,7 @@ export default function NewPlayerForm() {
         </div>
 
         <div className="text-center">
-          <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-2 flex items-center justify-center space-x-3">
+          <h1 className="text-2xl sm:text-4xl font-bold text-gray-900 dark:text-white mb-2 flex items-center justify-center space-x-3">
             <UserPlus className="h-8 w-8 text-blue-600" />
             <span>Ajouter un nouveau joueur</span>
           </h1>

@@ -3,7 +3,7 @@
  * Generates slugs like: /players/elena-phoenix
  */
 
-import { PlayerProfile } from '@/types/player-evaluation';
+import { PlayerProfile } from '@/types/player';
 
 /**
  * Generate URL-friendly slug from player name

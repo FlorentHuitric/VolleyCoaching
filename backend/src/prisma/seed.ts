@@ -631,7 +631,7 @@ async function seed() {
   console.log('📈 Creating performance metrics...');
 
   for (const player of players) {
-    const isAttacker = [Position.OUTSIDE_HITTER, Position.OPPOSITE, Position.MIDDLE_BLOCKER].includes(player.primaryPosition);
+    const isAttacker = ([Position.OUTSIDE_HITTER, Position.OPPOSITE, Position.MIDDLE_BLOCKER] as Position[]).includes(player.primaryPosition);
 
     await prisma.performanceMetric.createMany({
       data: [

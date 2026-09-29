@@ -18,6 +18,8 @@ export const GET_PLAYERS_BY_TEAM = gql`
 
   query GetPlayersByTeam($teamId: ID!) {
     playersByTeam(teamId: $teamId) {
+      assessmentKind
+      rosterTeamIds
       id
       firstName
       lastName
@@ -68,6 +70,20 @@ export const GET_PLAYER = gql`
 
   query GetPlayer($id: ID!) {
     player(id: $id) {
+      assessmentKind
+      rosterTeamIds
+      intakeProfile
+      email
+      phone
+      orgId
+      teamId
+      armReach
+      wingspan
+      experienceLevel
+      notes
+      medicalNotes
+      emergencyContact
+      emergencyPhone
       id
       firstName
       lastName

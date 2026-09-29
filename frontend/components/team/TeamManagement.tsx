@@ -84,14 +84,14 @@ export default function TeamManagement() {
   const { currentTeamId } = useTeam();
   const [activeTab, setActiveTab] = useState("overview");
   const [isEditing, setIsEditing] = useState(false);
-  
+
   // Fetch players via Apollo Client
   const { data } = useQuery(GET_PLAYERS_BY_TEAM, {
     variables: { teamId: currentTeamId },
     skip: !currentTeamId
   });
   const players: PlayerType[] = data?.playersByTeam || [];
-  
+
   const [lineup, setLineup] = useState<LineupPosition[]>([]);
 
   const [teamInfo, setTeamInfo] = useState<TeamInfo>({
@@ -180,7 +180,7 @@ export default function TeamManagement() {
       setTeamInfo(prev => ({
         ...prev,
         [parent]: {
-          ...prev[parent as keyof TeamInfo],
+          ...(typeof prev[parent as keyof TeamInfo] === "object" ? prev[parent as keyof TeamInfo] as object : {}),
           [child]: value
         }
       }));
@@ -420,7 +420,7 @@ export default function TeamManagement() {
           <DragAndDropLineupBuilder
             availablePlayers={players}
             onSaveLineup={handleSaveLineup}
-            initialLineup={lineup}
+            initialLineup={lineup.map(p=>({...p,position:p.position || "OUTSIDE_HITTER"}))}
           />
         </TabsContent>
 

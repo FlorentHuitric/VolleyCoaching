@@ -1,5 +1,7 @@
 'use client';
 
+import { useTeam } from '@/contexts/TeamContext';
+import { useAuth } from '@/lib/auth/AuthContext';
 import { useQuery, useMutation } from '@apollo/client';
 import {
   GET_PLAYERS_BY_TEAM,
@@ -19,12 +21,13 @@ import {
  * Uses Apollo Client to fetch data from GraphQL API
  */
 
-const DEFAULT_TEAM_ID = 'team-elite-squad';
-const DEFAULT_ORG_ID = 'org-volleycoaching-demo';
 
-export function usePlayersByTeam(teamId: string = DEFAULT_TEAM_ID) {
+export function usePlayersByTeam(teamId?: string) {
+  const { currentTeamId } = useTeam();
+  teamId = teamId || currentTeamId || undefined;
   const { data, loading, error, refetch } = useQuery(GET_PLAYERS_BY_TEAM, {
     variables: { teamId },
+    skip: !teamId,
   });
 
   return {
@@ -48,10 +51,12 @@ export function usePlayer(id: string) {
   };
 }
 
-export function useSearchPlayers(query: string, orgId: string = DEFAULT_ORG_ID) {
+export function useSearchPlayers(query: string, orgId?: string) {
+  const { user } = useAuth();
+  orgId = orgId || user?.orgId;
   const { data, loading, error } = useQuery(SEARCH_PLAYERS, {
     variables: { query, orgId },
-    skip: !query || query.length < 2,
+    skip: !orgId || !query || query.length < 2,
   });
 
   return {
@@ -61,10 +66,12 @@ export function useSearchPlayers(query: string, orgId: string = DEFAULT_ORG_ID) 
   };
 }
 
-export function usePlayersByPosition(position: string, teamId: string = DEFAULT_TEAM_ID) {
+export function usePlayersByPosition(position: string, teamId?: string) {
+  const { currentTeamId } = useTeam();
+  teamId = teamId || currentTeamId || undefined;
   const { data, loading, error } = useQuery(GET_PLAYERS_BY_POSITION, {
     variables: { position, teamId },
-    skip: !position,
+    skip: !position || !teamId,
   });
 
   return {
@@ -74,7 +81,9 @@ export function usePlayersByPosition(position: string, teamId: string = DEFAULT_
   };
 }
 
-export function useAvailablePlayers(teamId: string = DEFAULT_TEAM_ID) {
+export function useAvailablePlayers(teamId?: string) {
+  const { currentTeamId } = useTeam();
+  teamId = teamId || currentTeamId || undefined;
   const { data, loading, error } = useQuery(GET_AVAILABLE_PLAYERS, {
     variables: { teamId },
   });

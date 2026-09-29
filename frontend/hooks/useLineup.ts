@@ -1,5 +1,6 @@
 'use client';
 
+import type { VolleyballPosition } from '@/hooks/useCourtStore';
 import { useCallback } from 'react';
 import { useQuery } from '@apollo/client';
 import { GET_ACTIVE_LINEUP } from '@/graphql/queries/lineups';
@@ -7,7 +8,7 @@ import { useTeam } from '@/contexts/TeamContext';
 
 export interface LineupPosition {
   courtPosition: number;
-  position: string;
+  position: VolleyballPosition;
   player?: {
     id: string;
     personalInfo: {

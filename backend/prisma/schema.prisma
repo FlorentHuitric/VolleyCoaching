@@ -109,12 +109,20 @@ model Player {
   firstName         String
   lastName          String
   preferredName     String?
-  dateOfBirth       DateTime
+  dateOfBirth       DateTime?
   nationality       String
   email             String?
   phone             String?
   avatar            String?
-  jerseyNumber      Int
+  jerseyNumber      Int?
+  rosterTeamIds String[] @default([])
+  assessmentKind String @default("OBSERVED")
+  intakeProfile Json?
+  experienceLevel String?
+  notes String?
+  medicalNotes String?
+  emergencyContact String?
+  emergencyPhone String?
   // Volleyball Info
   primaryPosition   Position
   secondaryPosition Position?
@@ -338,6 +346,7 @@ model ExerciseTagRelation {
 // ============================================
 
 model TrainingSession {
+  plan             Json?             // Durable snapshot of a generated training plan
   id               String            @id @default(cuid())
   name             String
   description      String?           @db.Text

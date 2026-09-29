@@ -102,7 +102,7 @@ interface CourtStore {
   savePhase: (name: string) => void;
   loadPhase: (phase: TacticPhase) => void;
   setDisplayMode: (mode: DisplayMode) => void;
-  applyLineupToPlayers: (lineup: Array<{ courtPosition: number; position: string; player?: any }>, teamColor: string) => void;
+  applyLineupToPlayers: (lineup: Array<{ courtPosition: number; position: VolleyballPosition; player?: any }>, teamColor: string) => void;
 
   // Gestion des phases
   duplicateCurrentPhase: () => void;

@@ -7,25 +7,6 @@ const config: Config = {
     './app/**/*.{ts,tsx}',
     './lib/**/*.{ts,tsx}',
   ],
-  safelist: [
-    // Rarity gradient backgrounds
-    'bg-gradient-to-br',
-    'from-pink-400',
-    'via-purple-400',
-    'to-blue-400',
-    'from-red-500',
-    'to-pink-500',
-    'from-yellow-400',
-    'to-orange-400',
-    'from-purple-500',
-    'to-indigo-500',
-    'from-blue-500',
-    'to-cyan-500',
-    'from-green-500',
-    'to-emerald-500',
-    'from-gray-400',
-    'to-gray-500',
-  ],
   theme: {
     extend: {
       colors: {

@@ -1,3 +1,6 @@
+import type { GraphQLContext } from '../utils/auth.context';
+import { TrainingPlanResolver } from '../resolvers/TrainingPlanResolver';
+import { AccessPolicy } from '../utils/access.policy';
 import { ApolloServer } from '@apollo/server';
 import { buildSchema } from 'type-graphql';
 import { container } from './container';
@@ -17,7 +20,7 @@ import { AuthResolver } from '../resolvers/auth.resolver';
  * Apollo Server Configuration
  * Creates and configures the GraphQL server with type-graphql
  */
-export async function createApolloServer(): Promise<ApolloServer> {
+export async function createApolloServer(): Promise<ApolloServer<GraphQLContext>> {
   // Build TypeGraphQL schema
   const schema = await buildSchema({
     resolvers: [
@@ -28,18 +31,21 @@ export async function createApolloServer(): Promise<ApolloServer> {
       LineupResolver,
       EvaluationResolver,
       TrainingResolver,
+      TrainingPlanResolver,
       ExerciseResolver,
       // TODO: Enable UserResolver once auth is implemented
       // UserResolver,
     ],
     container: { get: (cls) => container.resolve(cls) },
     validate: true,
+    globalMiddlewares: [AccessPolicy],
     emitSchemaFile: process.env.NODE_ENV === 'development' ? './schema.gql' : false,
   });
 
   // Create Apollo Server
-  const server = new ApolloServer({
+  const server = new ApolloServer<GraphQLContext>({
     schema,
+    includeStacktraceInErrorResponses: process.env.NODE_ENV !== "production",
     formatError: (formattedError, error) => {
       // Log errors in development
       if (process.env.NODE_ENV === 'development') {

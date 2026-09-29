@@ -1,7 +1,10 @@
 'use client';
 
-import { useState } from 'react';
-import { useQuery } from '@apollo/client';
+import { useAuth } from '@/lib/auth/AuthContext';
+import { AppNavigation } from '@/components/layout/AppNavigation';
+import { getExerciseById } from '@/services/trainingService';
+import { useState, useEffect } from 'react';
+import { useQuery, gql } from '@apollo/client';
 import { GET_PLAYERS_BY_TEAM } from '@/graphql/queries/players';
 import { useTeam } from '@/contexts/TeamContext';
 import { TrainingSession } from '@/types/exercises';
@@ -19,16 +22,23 @@ import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 
 export default function TrainingPage() {
   const { currentTeamId } = useTeam();
-  
+  const { getAccessToken } = useAuth();
+  const [saving,setSaving] = useState(false);
+  const { data: savedData, refetch: reloadSessions } = useQuery(gql`query Plans($teamId: ID!) { savedTrainingPlans(teamId: $teamId) }`, {variables:{teamId:currentTeamId},skip:!currentTeamId});
+  async function mutate(query: string, variables: object) {
+   const response=await fetch(process.env.NEXT_PUBLIC_GRAPHQL_URL || 'http://localhost:3001/graphql',{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${getAccessToken()}`},body:JSON.stringify({query,variables})});
+   const result=await response.json();if(result.errors)throw new Error(result.errors[0].message);return result.data;
+  }
+
   // Fetch players via Apollo Client
   const { data } = useQuery(GET_PLAYERS_BY_TEAM, {
     variables: { teamId: currentTeamId },
     skip: !currentTeamId
   });
   const players = data?.playersByTeam || [];
-  
+
   const [generatedSession, setGeneratedSession] = useState<TrainingSession | null>(null);
-  const [savedSessions, setSavedSessions] = useState<TrainingSession[]>([]);
+  const savedSessions: TrainingSession[] = savedData?.savedTrainingPlans || [];
   const [viewingSession, setViewingSession] = useState<TrainingSession | null>(null);
 
   const handleSessionGenerated = (session: TrainingSession) => {
@@ -36,65 +46,34 @@ export default function TrainingPage() {
     setViewingSession(session);
   };
 
-  const handleSaveSession = () => {
-    if (generatedSession) {
-      setSavedSessions([...savedSessions, generatedSession]);
-      toast.success('Entraînement sauvegardé !');
-    }
+  useEffect(() => { setGeneratedSession(null); setViewingSession(null); }, [currentTeamId]);
+  const handleSaveSession = async () => {
+    if (!generatedSession || !currentTeamId || saving) return;
+    setSaving(true);
+    try {
+      const exerciseSnapshots=Object.fromEntries(generatedSession.phases.flatMap(p=>p.exercises).map(e=>[e.exerciseId,getExerciseById(e.exerciseId)]).filter(([,e])=>e));
+      const data=await mutate('mutation SavePlan($teamId: ID!, $plan: JSON!) { saveTrainingPlan(teamId: $teamId, plan: $plan) }',{teamId:currentTeamId,plan:{...generatedSession,exerciseSnapshots}});
+      setGeneratedSession(data.saveTrainingPlan);setViewingSession(data.saveTrainingPlan);await reloadSessions();toast.success('Séance enregistrée sur le serveur.');
+    } catch(e){toast.error(e instanceof Error?e.message:'Enregistrement impossible.')}finally{setSaving(false)}
   };
-
-  const handleMarkComplete = () => {
-    if (viewingSession) {
-      const updatedSession = { ...viewingSession, completed: true };
-      setViewingSession(updatedSession);
-      setSavedSessions(
-        savedSessions.map(s => (s.id === updatedSession.id ? updatedSession : s))
-      );
-    }
+  const handleMarkComplete = async () => {
+    if(!viewingSession)return;
+    if(!savedSessions.some(s=>s.id===viewingSession.id)){toast.error('Enregistrez la séance avant de la terminer.');return}
+    try{await mutate('mutation Complete($id: ID!) { completeTrainingSession(id: $id) { id } }',{id:viewingSession.id});setViewingSession({...viewingSession,completed:true});await reloadSessions();toast.success('Séance terminée.')}catch(e){toast.error(e instanceof Error?e.message:'Modification impossible.')}
   };
-
-  const handleDeleteSession = (sessionId: string) => {
-    if (confirm('Êtes-vous sûr de vouloir supprimer cet entraînement ?')) {
-      setSavedSessions(savedSessions.filter(s => s.id !== sessionId));
-      if (viewingSession?.id === sessionId) {
-        setViewingSession(null);
-      }
-    }
+  const handleDeleteSession = async (id: string) => {
+    if(!confirm('Supprimer définitivement cette séance ?'))return;
+    try{await mutate('mutation Delete($id: ID!) { deleteTrainingPlan(id: $id) }',{id});if(viewingSession?.id===id)setViewingSession(null);await reloadSessions()}catch(e){toast.error(e instanceof Error?e.message:'Suppression impossible.')}
   };
 
   return (
     <ProtectedRoute>
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
-      {/* Header */}
-      <header className="bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b shadow-sm sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <Link href="/">
-                <Button variant="ghost" size="sm">
-                  <ArrowLeft className="h-4 w-4 mr-2" />
-                  Retour
-                </Button>
-              </Link>
-              <h1 className="text-2xl md:text-3xl font-bold text-foreground flex items-center space-x-3">
-                <div className="w-8 h-8 md:w-10 md:h-10 bg-gradient-to-br from-purple-400 to-blue-500 rounded-full flex items-center justify-center shadow-lg">
-                  <span className="text-white font-bold text-sm md:text-lg">🏐</span>
-                </div>
-                <span className="hidden sm:block">Gestion des Entraînements</span>
-                <span className="sm:hidden">Entraînements</span>
-              </h1>
-            </div>
-            <div className="flex items-center gap-4">
-              <ThemeToggle />
-            </div>
-          </div>
-        </div>
-      </header>
-
+      <div className="min-h-screen astren-workspace">
+      <AppNavigation />
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <Tabs defaultValue="generator" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3 bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700">
+          <TabsList className="grid w-full grid-cols-3 training-tabs bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700">
             <TabsTrigger
               value="generator"
               className="flex items-center space-x-2 data-[state=active]:bg-blue-100 dark:data-[state=active]:bg-blue-900/30 data-[state=active]:text-blue-900 dark:data-[state=active]:text-blue-100"
@@ -114,7 +93,7 @@ export default function TrainingPage() {
               className="flex items-center space-x-2 data-[state=active]:bg-green-100 dark:data-[state=active]:bg-green-900/30 data-[state=active]:text-green-900 dark:data-[state=active]:text-green-100"
             >
               <Calendar className="h-4 w-4" />
-              <span>Mes Séances ({savedSessions.length})</span>
+              <span>Séances ({savedSessions.length})</span>
             </TabsTrigger>
           </TabsList>
 
@@ -124,6 +103,7 @@ export default function TrainingPage() {
               {/* Generator */}
               <div>
                 <TrainingGenerator
+                  key={currentTeamId || "empty"}
                   availablePlayers={players}
                   onGenerated={handleSessionGenerated}
                 />
@@ -140,6 +120,7 @@ export default function TrainingPage() {
                       {generatedSession && !savedSessions.find(s => s.id === generatedSession.id) && (
                         <Button
                           onClick={handleSaveSession}
+                          disabled={saving}
                           size="sm"
                           className="bg-green-600 hover:bg-green-700 text-white"
                         >

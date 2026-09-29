@@ -1,8 +1,9 @@
 'use client';
+import { useAuth } from '@/lib/auth/AuthContext';
 
 import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
-import { useMutation } from '@apollo/client';
+import { useMutation, gql } from '@apollo/client';
 import { PlayerType } from '@/types/player';
 import { UPDATE_PLAYER } from '@/graphql/mutations/players';
 
@@ -57,10 +58,11 @@ export default function NewEvaluationWizard({
   battery,
   onClose
 }: NewEvaluationWizardProps) {
+  const { user } = useAuth();
   const [updatePlayer] = useMutation(UPDATE_PLAYER);
   const { createEvaluationSession, sessionId, loading: creatingSession } = useCreateEvaluationSession();
   const { completeEvaluationSession, loading: completingSession } = useCompleteEvaluationSession();
-  
+
   const [currentTestIndex, setCurrentTestIndex] = useState(0);
   const [session, setSession] = useState<EvaluationSession | null>(null);
   const [completedTests, setCompletedTests] = useState<Set<number>>(new Set());
@@ -71,15 +73,15 @@ export default function NewEvaluationWizard({
       try {
         const newSessionId = await createEvaluationSession(
           player.id,
-          'current_coach', // TODO: Get from auth context
+          user!.id,
           battery.name
         );
-        
+
         // Create local session state for tracking tests
         setSession({
-          id: newSessionId || `temp-${Date.now()}`,
+          id: newSessionId,
           playerId: player.id,
-          evaluatorId: 'current_coach',
+          evaluatorId: user!.id,
           date: new Date(),
           location: 'Training Facility',
           duration: battery.estimatedDuration,
@@ -99,7 +101,7 @@ export default function NewEvaluationWizard({
       }
     };
 
-    initSession();
+    if (user) initSession();
   }, []);
 
   const currentTestId = battery.requiredTests[currentTestIndex];
@@ -107,7 +109,7 @@ export default function NewEvaluationWizard({
 
   const handleTestComplete = (testData: EvaluationTest) => {
     if (!session) return;
-    
+
     // Update session with new test
     const updatedSession = {
       ...session,
@@ -129,34 +131,12 @@ export default function NewEvaluationWizard({
     }
   };
 
+  const [saveTests, {loading: savingTests}] = useMutation(gql`mutation SaveTests($sessionId: ID!, $tests: JSON!) {completeTestBattery(sessionId:$sessionId,tests:$tests)}`, {refetchQueries:['GetPlayersByTeam','RecordedTests']});
   const handleFinish = async () => {
     if (!session) return;
 
     try {
-      // Prepare evaluation data from completed tests
-      const evaluationData = {
-        evaluationDate: new Date().toISOString(),
-        notes: `Évaluation complétée avec la batterie ${battery.name}`,
-        tests: session.tests // Include all test data
-      };
-
-      // Complete session via GraphQL
-      const completedEvaluation = await completeEvaluationSession(
-        session.id,
-        evaluationData
-      );
-
-      // Update player's last evaluation date via GraphQL mutation
-      await updatePlayer({
-        variables: {
-          id: player.id,
-          input: {
-            lastEvaluationDate: new Date().toISOString()
-          }
-        },
-        refetchQueries: ['GetPlayer', 'GetPlayersByTeam']
-      });
-
+      await saveTests({variables:{sessionId:session.id,tests:session.tests}});
       toast.success(`Évaluation terminée avec ${session.tests.length} tests!`);
       onClose();
     } catch (error) {
@@ -266,7 +246,7 @@ export default function NewEvaluationWizard({
             </CardHeader>
             <CardContent>
               {/* Render appropriate test form */}
-              {renderTestForm(currentTestId, session, handleTestComplete)}
+              {renderTestForm(currentTestId, session, handleTestComplete, onClose)}
 
               {/* Navigation Buttons */}
               <div className="flex items-center justify-between mt-6 pt-6 border-t">
@@ -288,7 +268,7 @@ export default function NewEvaluationWizard({
                   ) : (
                     <Button
                       onClick={handleFinish}
-                      disabled={!canFinish || completingSession}
+                      disabled={savingTests || !canFinish || completingSession}
                       className="bg-green-600 hover:bg-green-700"
                     >
                       {completingSession ? (
@@ -332,7 +312,8 @@ function getTestIcon(testId: string) {
 function renderTestForm(
   testId: string,
   session: EvaluationSession,
-  onComplete: (test: EvaluationTest) => void
+  onComplete: (test: EvaluationTest) => void,
+  onCancel: () => void
 ) {
   const existingTest = session.tests.find(t => t.testId === testId);
 
@@ -363,43 +344,41 @@ function renderTestForm(
       return <DefenseTestForm initialData={existingTest as any} onComplete={onComplete} />;
     case 'game_situation':
       return <GameSituationTestForm initialData={existingTest as any} onComplete={onComplete} />;
-    
+
     // Phase 2 - Mental tests
     case 'mental_toughness':
-      return <MentalToughnessTestForm 
-        initialData={existingTest as any} 
-        onComplete={onComplete} 
-        onCancel={() => onComplete({ testId: 'mental_toughness', category: 'MENTAL', results: {} } as any)} 
+      return <MentalToughnessTestForm
+        initialData={existingTest as any}
+        onComplete={onComplete}
+        onCancel={onCancel}
       />;
-    
+
     case 'game_intelligence':
-      return <GameIntelligenceTestForm 
-        initialData={existingTest as any} 
-        onComplete={onComplete} 
-        onCancel={() => onComplete({ testId: 'game_intelligence', category: 'MENTAL', results: {} } as any)} 
+      return <GameIntelligenceTestForm
+        initialData={existingTest as any}
+        onComplete={onComplete}
+        onCancel={onCancel}
       />;
-    
+
     case 'leadership':
-      return <LeadershipEvaluationForm 
-        initialData={existingTest as any} 
-        onComplete={onComplete} 
-        onCancel={() => onComplete({ testId: 'leadership', category: 'MENTAL', results: {} } as any)} 
+      return <LeadershipEvaluationForm
+        initialData={existingTest as any}
+        onComplete={onComplete}
+        onCancel={onCancel}
       />;
-    
+
     case 'communication':
-      return <CommunicationTestForm 
-        initialData={existingTest as any} 
-        onComplete={onComplete} 
-        onCancel={() => onComplete({ testId: 'communication', category: 'MENTAL', results: {} } as any)} 
+      return <CommunicationTestForm
+        initialData={existingTest as any}
+        onComplete={onComplete}
+        onCancel={onCancel}
       />;
-    
+
     default:
       return (
         <div className="p-8 text-center text-gray-500">
           <p>Formulaire pour {testId} en cours de développement</p>
-          <Button onClick={() => onComplete({ testId, category: 'physical' } as any)} className="mt-4">
-            Marquer comme complété (temporaire)
-          </Button>
+          <p>Ce test ne peut pas encore être validé.</p>
         </div>
       );
   }

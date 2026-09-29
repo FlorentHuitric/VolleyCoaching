@@ -93,3 +93,8 @@ backend/prisma/migrations/
 
 # Generated GraphQL schema
 backend/schema.gql
+# Private club imports and source workbooks
+private-imports/
+usb-private-payload.json
+*.xlsm
+*.dump

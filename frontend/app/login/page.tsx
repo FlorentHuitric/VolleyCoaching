@@ -1,141 +1,29 @@
 'use client';
-
-import { useState } from 'react';
+import { useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/lib/auth/AuthContext';
+import { AstrenMark } from '@/components/layout/AstrenMark';
+import { ThemeToggle } from '@/components/ui/theme-toggle';
+import { Button } from '@/components/ui/button';
+import { ArrowRight, Eye, EyeOff, LoaderCircle } from 'lucide-react';
 import { toast } from 'sonner';
-
-export default function LoginPage() {
-  const [emailOrUsername, setEmailOrUsername] = useState('');
-  const [password, setPassword] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const { login } = useAuth();
-  const router = useRouter();
-  const searchParams = useSearchParams();
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
-
-    try {
-      await login(emailOrUsername, password);
-
-      toast.success('Welcome back!');
-
-      // Small delay to ensure state is updated before redirect
-      setTimeout(() => {
-        const redirect = searchParams?.get('redirect') || '/teams';
-        router.push(redirect);
-      }, 100);
-    } catch (error: any) {
-      console.error('Login error:', error);
-      toast.error(error.message || 'Login failed. Please check your credentials.');
-      setIsLoading(false);
-    }
-  };
-
-  return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 px-4 dark:from-gray-900 dark:to-gray-800">
-      <div className="w-full max-w-md">
-        <div className="rounded-2xl bg-white p-8 shadow-2xl dark:bg-gray-800">
-          {/* Header */}
-          <div className="mb-8 text-center">
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-              VolleyCoaching
-            </h1>
-            <p className="mt-2 text-gray-600 dark:text-gray-400">
-              Sign in to your account
-            </p>
-          </div>
-
-          {/* Form */}
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div>
-              <label
-                htmlFor="emailOrUsername"
-                className="block text-sm font-medium text-gray-700 dark:text-gray-300"
-              >
-                Email or Username
-              </label>
-              <input
-                id="emailOrUsername"
-                type="text"
-                value={emailOrUsername}
-                onChange={(e) => setEmailOrUsername(e.target.value)}
-                required
-                className="mt-1 block w-full rounded-lg border border-gray-300 px-4 py-3 text-gray-900 placeholder-gray-500 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
-                placeholder="your@email.com or username"
-                disabled={isLoading}
-              />
-            </div>
-
-            <div>
-              <label
-                htmlFor="password"
-                className="block text-sm font-medium text-gray-700 dark:text-gray-300"
-              >
-                Password
-              </label>
-              <input
-                id="password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                className="mt-1 block w-full rounded-lg border border-gray-300 px-4 py-3 text-gray-900 placeholder-gray-500 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
-                placeholder="••••••••"
-                disabled={isLoading}
-              />
-            </div>
-
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="w-full rounded-lg bg-blue-600 px-4 py-3 font-semibold text-white transition-colors hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-blue-500 dark:hover:bg-blue-600"
-            >
-              {isLoading ? (
-                <span className="flex items-center justify-center">
-                  <svg
-                    className="mr-2 h-5 w-5 animate-spin"
-                    xmlns="http://www.w3.org/2000/svg"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                  >
-                    <circle
-                      className="opacity-25"
-                      cx="12"
-                      cy="12"
-                      r="10"
-                      stroke="currentColor"
-                      strokeWidth="4"
-                    />
-                    <path
-                      className="opacity-75"
-                      fill="currentColor"
-                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                    />
-                  </svg>
-                  Signing in...
-                </span>
-              ) : (
-                'Sign in'
-              )}
-            </button>
-          </form>
-
-          {/* Footer */}
-          <div className="mt-6 text-center text-sm text-gray-600 dark:text-gray-400">
-            Don't have an account?{' '}
-            <Link
-              href="/signup"
-              className="font-semibold text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 cursor-pointer"
-            >
-              Sign up
-            </Link>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
+function LoginForm() {
+ const [emailOrUsername,setEmailOrUsername]=useState('');const [password,setPassword]=useState('');const [visible,setVisible]=useState(false);const [busy,setBusy]=useState(false);const [error,setError]=useState('');
+ const {login}=useAuth();const router=useRouter();const searchParams=useSearchParams();
+ async function submit(e:React.FormEvent){e.preventDefault();setBusy(true);setError('');try{await login(emailOrUsername,password);const redirect=searchParams?.get('redirect') || '/team';router.push(redirect.startsWith('/')&&!redirect.startsWith('//')?redirect:'/team');}catch{setError('Connexion impossible. Vérifiez votre identifiant et votre mot de passe.');setBusy(false);}}
+ return <main className="astren-auth">
+   <div className="astren-auth-theme"><ThemeToggle/></div>
+   <div className="astren-auth-layout">
+    <section className="astren-auth-story"><AstrenMark/><p className="astren-eyebrow">Astren Orison · VolleyCoaching</p><h1>Le talent s’éveille.<br/><em>Le collectif se construit.</em></h1><p>Un espace pour préparer vos séances, accompagner chaque joueur et donner forme à votre jeu.</p><div className="astren-auth-notes"><span>01 · Préparer</span><span>02 · Observer</span><span>03 · Progresser</span></div></section>
+    <section className="astren-auth-card" aria-labelledby="login-title"><p className="astren-eyebrow">Votre espace de coaching</p><h2 id="login-title">Heureux de vous retrouver.</h2><p className="text-muted-foreground text-sm mb-7">Retrouvez votre équipe et préparez la suite.</p>
+    <form onSubmit={submit} className="space-y-5">
+     <div><label htmlFor="emailOrUsername">E-mail ou identifiant</label><input id="emailOrUsername" autoComplete="username" value={emailOrUsername} onChange={e=>setEmailOrUsername(e.target.value)} required disabled={busy} placeholder="Votre identifiant"/></div>
+     <div><label htmlFor="password">Mot de passe</label><div className="relative"><input id="password" type={visible?'text':'password'} autoComplete="current-password" value={password} onChange={e=>setPassword(e.target.value)} required disabled={busy} className="pr-12"/><button type="button" className="astren-password-toggle" aria-label={visible?'Masquer le mot de passe':'Afficher le mot de passe'} aria-pressed={visible} onClick={()=>setVisible(!visible)}>{visible?<EyeOff size={18}/>:<Eye size={18}/>}</button></div></div>
+     {error&&<p role="alert" className="text-destructive text-sm">{error}</p>}
+     <Button type="submit" className="w-full h-12" disabled={busy}>{busy?<><LoaderCircle className="animate-spin"/>Connexion…</>:<>Entrer dans mon espace<ArrowRight/></>}</Button>
+    </form><div className="astren-auth-footer">Votre premier entraînement ici ? <Link href="/signup">Créer un espace</Link></div><Link href="/presentation" className="text-sm text-muted-foreground underline underline-offset-4">Découvrir l’atelier de coaching</Link></section>
+   </div>
+ </main>;
 }
+export default function LoginPage(){return <Suspense fallback={<main className="astren-auth">Chargement de votre espace…</main>}><LoginForm/></Suspense>;}

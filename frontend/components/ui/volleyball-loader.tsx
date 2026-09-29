@@ -98,7 +98,7 @@ export function VolleyballLoader({ size = 80, className = '' }: VolleyballLoader
 
 export function FullPageVolleyballLoader() {
   return (
-    <div className="fixed inset-0 flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 z-50">
+    <div className="fixed inset-0 flex items-center justify-center astren-workspace z-50">
       <div className="text-center">
         <VolleyballLoader size={120} />
         <p className="mt-6 text-lg font-medium text-gray-600 dark:text-gray-400 animate-pulse">

@@ -3,7 +3,7 @@
 import { useState, useCallback } from 'react';
 import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, closestCenter, useDroppable, useDraggable } from '@dnd-kit/core';
 import { SortableContext, arrayMove } from '@dnd-kit/sortable';
-import { PlayerProfile } from '@/types/player-evaluation';
+import { PlayerProfile } from '@/types/player';
 import { VolleyballPosition } from '@/hooks/useCourtStore';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -51,7 +51,7 @@ const CourtPosition = ({
       {player ? (
         <div className="w-full h-full flex flex-col items-center justify-center p-1">
           <Avatar className="w-10 h-10">
-            <AvatarImage src={player.avatar} />
+            <AvatarImage src={player.avatar || undefined} />
             <AvatarFallback className="text-xs bg-blue-600 text-white font-bold">
               {player.jerseyNumber}
             </AvatarFallback>
@@ -105,7 +105,7 @@ const DraggablePlayer = ({
     >
       <div className="flex items-center space-x-3 min-w-0 w-full">
         <Avatar className="w-10 h-10 flex-shrink-0">
-          <AvatarImage src={player.avatar} />
+          <AvatarImage src={player.avatar || undefined} />
           <AvatarFallback>
             {player.firstName?.[0] || '?'}{player.lastName?.[0] || '?'}
           </AvatarFallback>
@@ -116,7 +116,7 @@ const DraggablePlayer = ({
           </p>
           <div className="flex items-center space-x-2 mt-1">
             <Badge variant="secondary" className="text-xs flex-shrink-0">
-              {getPositionAbbreviation(player.technicalProfile?.primaryPosition || player.primaryPosition || 'OUTSIDE_HITTER')}
+              {getPositionAbbreviation(player.primaryPosition || 'OUTSIDE_HITTER')}
             </Badge>
             <span className="text-xs text-gray-500 flex-shrink-0">
               #{player.jerseyNumber || 0}
@@ -229,8 +229,8 @@ export default function DragAndDropLineupBuilder({
     }
   }, []);
 
-  const handleSave = useCallback(() => {
-    onSaveLineup(lineup);
+  const handleSave = useCallback(async () => {
+    try { await onSaveLineup(lineup); } catch { /* The parent displays the server error. */ }
   }, [lineup, onSaveLineup]);
 
   const assignedPlayerIds = new Set(lineup.map(pos => pos.player?.id).filter(Boolean));

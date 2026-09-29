@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Exercise, ExerciseResult, EvaluationSession } from '@/types/exercises';
-import { PlayerProfile, SkillRating } from '@/types/player-evaluation';
+import { PlayerProfile, SkillRating } from '@/types/player';
 import { EXERCICES_EVALUATION, TEMPLATES_EVALUATION_POSITION } from '@/data/exercices-evaluation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -181,7 +181,7 @@ function ExerciseStep({ exercise, onComplete, onBack, playerId }: ExerciseStepPr
                     min={mesure.valeurMin}
                     max={mesure.valeurMax}
                     step={mesure.typeValeur === 'temps' ? 0.1 : 1}
-                    value={resultats[mesure.nom] || 0}
+                    value={typeof resultats[mesure.nom] === "number" ? resultats[mesure.nom] as number : 0}
                     onChange={(e) => setResultats(prev => ({
                       ...prev,
                       [mesure.nom]: parseFloat(e.target.value) || 0

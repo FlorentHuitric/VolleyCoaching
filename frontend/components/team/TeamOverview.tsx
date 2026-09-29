@@ -26,7 +26,7 @@ interface TeamOverviewProps {
 export function TeamOverview({ team, onEdit }: TeamOverviewProps) {
   const getLevelColor = (level: string) => {
     switch (level) {
-      case 'ELITE':
+      case 'PROFESSIONAL':
         return 'bg-purple-500';
       case 'SENIOR':
         return 'bg-blue-500';
@@ -41,8 +41,8 @@ export function TeamOverview({ team, onEdit }: TeamOverviewProps) {
 
   const getLevelLabel = (level: string) => {
     switch (level) {
-      case 'ELITE':
-        return 'Élite';
+      case 'PROFESSIONAL':
+        return 'Professionnel';
       case 'SENIOR':
         return 'Senior';
       case 'JUNIOR':
@@ -59,17 +59,17 @@ export function TeamOverview({ team, onEdit }: TeamOverviewProps) {
       {/* Team Info Card */}
       <Card className="bg-white dark:bg-gray-900">
         <CardHeader>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Avatar className="h-20 w-20">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="flex items-center gap-3 min-w-0">
+              <Avatar className="h-12 w-12 sm:h-20 sm:w-20 shrink-0">
                 <AvatarImage src={team.avatar} alt={team.name} />
                 <AvatarFallback className="text-2xl">
                   {team.name.substring(0, 2).toUpperCase()}
                 </AvatarFallback>
               </Avatar>
               <div>
-                <CardTitle className="text-2xl mb-2">{team.name}</CardTitle>
-                <div className="flex items-center gap-2">
+                <CardTitle className="text-xl sm:text-2xl mb-2 break-words">{team.name}</CardTitle>
+                <div className="flex flex-wrap items-center gap-2">
                   <Badge className={`${getLevelColor(team.level)} text-white`}>
                     {getLevelLabel(team.level)}
                   </Badge>
@@ -93,7 +93,7 @@ export function TeamOverview({ team, onEdit }: TeamOverviewProps) {
       </Card>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Card>
           <CardHeader className="pb-2">
             <div className="flex items-center gap-2 text-muted-foreground">

@@ -3,7 +3,7 @@
  * Following DRY and SOLID principles
  */
 
-import { PlayerProfile } from '@/types/player-evaluation';
+import { PlayerType as PlayerProfile } from '@/types/player';
 import {
   TrainingSession,
   TrainingPhase,
@@ -114,13 +114,15 @@ export const calculatePhaseDurations = (
       break;
   }
 
-  return {
+  const durations = {
     warmup: Math.round(totalDuration * warmupPercent),
     stretching: Math.round(totalDuration * stretchingPercent),
     technical: Math.round(totalDuration * technicalPercent),
     intense: Math.round(totalDuration * intensePercent),
     game: Math.round(totalDuration * gamePercent)
   };
+  durations.technical += totalDuration - Object.values(durations).reduce((sum,n)=>sum+n,0);
+  return durations;
 };
 
 // ============================================
@@ -147,6 +149,9 @@ export const selectExercisesForPhase = (
 
   // Filter exercises by phase requirements
   let candidates = TRAINING_EXERCISES.filter(exercise => {
+    // Warm-up and stretching must be explicitly tagged; a sprint is not a substitute.
+    if (phaseType==='warmup' && !exercise.tags.includes('échauffement')) return false;
+    if (phaseType==='stretching' && !exercise.tags.includes('étirements')) return false;
     // Must match category
     if (!phaseCategories[phaseType]?.includes(exercise.category)) return false;
 

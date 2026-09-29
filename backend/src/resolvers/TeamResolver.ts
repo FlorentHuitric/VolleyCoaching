@@ -1,3 +1,4 @@
+import { rosterWhere } from '../utils/roster';
 import { Resolver, Query, Mutation, Arg, ID, FieldResolver, Root, UseMiddleware } from 'type-graphql';
 import { injectable, inject } from 'tsyringe';
 import { GraphQLError } from 'graphql';
@@ -50,14 +51,15 @@ export class TeamResolver {
   @UseMiddleware(Authenticated())
   @Query(() => [Team], { description: 'Get all teams for the current coach' })
   async myTeams(@CurrentUserId() userId: string): Promise<Team[]> {
+    const user = await this.prisma.user.findUniqueOrThrow({ where: { id: userId } });
     return this.prisma.team.findMany({
-      where: { coachId: userId },
+      where: user.role === "ADMIN" ? { orgId: user.orgId } : { coachId: userId },
       include: {
         _count: {
           select: { players: true },
         },
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { name: 'asc' },
     });
   }
 
@@ -94,7 +96,7 @@ export class TeamResolver {
 
     return {
       ...team,
-      players: team.players,
+      players: await this.prisma.player.findMany({where: rosterWhere(id)}),
     };
   }
 
@@ -143,7 +145,7 @@ export class TeamResolver {
   @FieldResolver(() => Number)
   async playerCount(@Root() team: Team): Promise<number> {
     const count = await this.prisma.player.count({
-      where: { teamId: team.id },
+      where: rosterWhere(team.id),
     });
     return count;
   }

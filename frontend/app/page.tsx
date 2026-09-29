@@ -9,7 +9,7 @@ import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 export default function Home() {
   return (
     <ProtectedRoute>
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
+      <div className="min-h-screen astren-workspace">
       <AppNavigation />
 
       {/* Hero Section with Court */}
@@ -27,7 +27,7 @@ export default function Home() {
             {/* Court Container */}
             <div className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm rounded-2xl shadow-2xl border border-white/20 overflow-hidden">
               {/* Court Header */}
-              <div className="px-4 md:px-6 py-3 md:py-4 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-orange-50 to-red-50 dark:from-orange-900/20 dark:to-red-900/20">
+              <div className="px-4 md:px-6 py-3 md:py-4 border-b border-gray-200 dark:border-gray-700 bg-secondary">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-3">
                     <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>

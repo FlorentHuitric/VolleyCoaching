@@ -47,16 +47,17 @@ export class EvaluationService {
    * @param weight - Weight of new evaluation (1.0 = 100% for first eval, 0.3 = 30% for updates)
    */
   private blendStats(current: any, evaluation: any, weight: number): any {
+    if (!evaluation) return current;
     if (!current) return evaluation; // First evaluation - use 100%
 
-    const blended: any = {};
+    const blended: any = { ...current };
 
     // Recursively blend nested objects
     Object.keys(evaluation).forEach(key => {
-      if (typeof evaluation[key] === 'object' && !Array.isArray(evaluation[key])) {
+      if (evaluation[key] && typeof evaluation[key] === 'object' && !Array.isArray(evaluation[key])) {
         blended[key] = this.blendStats(current[key], evaluation[key], weight);
       } else if (typeof evaluation[key] === 'number') {
-        const currentValue = current[key] || 0;
+        const currentValue = typeof current[key] === "number" ? current[key] : evaluation[key];
         // Weighted average: current * (1-weight) + evaluation * weight
         blended[key] = currentValue * (1 - weight) + evaluation[key] * weight;
       } else {
@@ -86,7 +87,10 @@ export class EvaluationService {
       notes?: string;
     }
   ): Promise<{ session: EvaluationSession; evaluation: Evaluation }> {
-    const session = await this.prisma.evaluationSession.findUnique({
+    if (![evaluationData.overallRating, evaluationData.potentialRating].every(value => Number.isFinite(value) && value >= 0 && value <= 10)) throw new Error('Les notes doivent être comprises entre 0 et 10.');
+    return this.prisma.$transaction(async tx => {
+      await tx.$queryRaw`SELECT p.id FROM players p JOIN evaluation_sessions s ON s."playerId" = p.id WHERE s.id = ${sessionId} FOR UPDATE OF p`;
+    const session = await tx.evaluationSession.findUnique({
       where: { id: sessionId },
       include: { player: true },
     });
@@ -95,10 +99,11 @@ export class EvaluationService {
       throw new Error('Session not found');
     }
 
+    if (session.status === SessionStatus.COMPLETED) throw new Error('Cette évaluation est déjà terminée.');
     const player = session.player;
 
     // Determine if this is first evaluation (unrated player)
-    const isFirstEvaluation = player.currentRating === null;
+    const isFirstEvaluation = player.currentRating === null || player.assessmentKind === 'ESTIMATED';
     const blendWeight = isFirstEvaluation ? 1.0 : 0.3; // 100% or 30%
 
     // Calculate blended stats
@@ -116,7 +121,7 @@ export class EvaluationService {
       : (player.potentialRating || 0) * 0.7 + evaluationData.potentialRating * 0.3;
 
     // Mark previous evaluations as not current
-    await this.prisma.evaluation.updateMany({
+    await tx.evaluation.updateMany({
       where: {
         playerId: session.playerId,
         isCurrent: true,
@@ -125,7 +130,7 @@ export class EvaluationService {
     });
 
     // Create new evaluation
-    const evaluation = await this.prisma.evaluation.create({
+    const evaluation = await tx.evaluation.create({
       data: {
         playerId: session.playerId,
         evaluatorId: session.evaluatorId,
@@ -135,10 +140,11 @@ export class EvaluationService {
     });
 
     // ✨ UPDATE PLAYER STATS (Source of Truth)
-    await this.prisma.player.update({
+    await tx.player.update({
       where: { id: session.playerId },
       data: {
-        currentRating: newOverallRating,
+        assessmentKind: 'OBSERVED',
+          currentRating: newOverallRating,
         potentialRating: newPotentialRating,
         currentTechnical: newTechnical,
         currentPhysical: newPhysical,
@@ -151,7 +157,7 @@ export class EvaluationService {
     });
 
     // Update session status
-    const updatedSession = await this.prisma.evaluationSession.update({
+    const updatedSession = await tx.evaluationSession.update({
       where: { id: sessionId },
       data: {
         status: SessionStatus.COMPLETED,
@@ -164,6 +170,7 @@ export class EvaluationService {
     });
 
     return { session: updatedSession, evaluation };
+    });
   }
 
   async getEvaluationHistory(playerId: string): Promise<Evaluation[]> {

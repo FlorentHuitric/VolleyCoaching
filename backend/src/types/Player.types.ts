@@ -1,4 +1,5 @@
 import { ObjectType, Field, ID, registerEnumType, InputType } from 'type-graphql';
+import GraphQLJSON from 'graphql-type-json';
 import { Position, PlayerStatus, ContractLevel } from '@prisma/client';
 import { EvaluationType } from './Evaluation.types';
 import { TechnicalSkills, PhysicalAttributes, MentalAttributes } from './EvaluationStructures.types';
@@ -10,6 +11,28 @@ registerEnumType(ContractLevel, { name: 'ContractLevel' });
 
 @ObjectType()
 export class PlayerType {
+  @Field(() => [String])
+  rosterTeamIds: string[];
+  @Field(() => String)
+  assessmentKind: string;
+  @Field(() => GraphQLJSON, { nullable: true })
+  intakeProfile?: unknown;
+
+  @Field(() => String, { nullable: true })
+  experienceLevel?: string;
+
+  @Field(() => String, { nullable: true })
+  notes?: string;
+
+  @Field(() => String, { nullable: true })
+  medicalNotes?: string;
+
+  @Field(() => String, { nullable: true })
+  emergencyContact?: string;
+
+  @Field(() => String, { nullable: true })
+  emergencyPhone?: string;
+
   @Field(() => ID)
   id: string;
 
@@ -22,8 +45,8 @@ export class PlayerType {
   @Field(() => String, { nullable: true })
   preferredName?: string;
 
-  @Field(() => Date)
-  dateOfBirth: Date;
+  @Field(() => Date, { nullable: true })
+  dateOfBirth?: Date | null;
 
   @Field(() => String)
   nationality: string;
@@ -37,8 +60,8 @@ export class PlayerType {
   @Field(() => String, { nullable: true })
   avatar?: string;
 
-  @Field(() => Number)
-  jerseyNumber: number;
+  @Field(() => Number, { nullable: true })
+  jerseyNumber?: number | null;
 
   @Field(() => Position)
   primaryPosition: Position;
@@ -124,6 +147,21 @@ export class PlayerType {
 
 @InputType()
 export class CreatePlayerInput {
+  @Field(() => String, { nullable: true })
+  experienceLevel?: string;
+
+  @Field(() => String, { nullable: true })
+  notes?: string;
+
+  @Field(() => String, { nullable: true })
+  medicalNotes?: string;
+
+  @Field(() => String, { nullable: true })
+  emergencyContact?: string;
+
+  @Field(() => String, { nullable: true })
+  emergencyPhone?: string;
+
   @Field(() => String)
   firstName: string;
 
@@ -190,6 +228,26 @@ export class CreatePlayerInput {
 
 @InputType()
 export class UpdatePlayerInput {
+  @Field(() => GraphQLJSON, { nullable: true })
+  assessment?: unknown;
+  @Field(() => Date, { nullable: true })
+  dateOfBirth?: Date | null;
+
+  @Field(() => String, { nullable: true })
+  experienceLevel?: string;
+
+  @Field(() => String, { nullable: true })
+  notes?: string;
+
+  @Field(() => String, { nullable: true })
+  medicalNotes?: string;
+
+  @Field(() => String, { nullable: true })
+  emergencyContact?: string;
+
+  @Field(() => String, { nullable: true })
+  emergencyPhone?: string;
+
   @Field(() => String, { nullable: true })
   firstName?: string;
 

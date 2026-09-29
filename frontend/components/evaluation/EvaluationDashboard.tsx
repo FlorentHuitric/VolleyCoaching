@@ -36,15 +36,15 @@ import EvaluationHistory from './EvaluationHistory';
 
 export default function EvaluationDashboard() {
   const { currentTeamId } = useTeam();
-  
+
   // Fetch players via Apollo Client
   const { data, loading: playersLoading, refetch } = useQuery(GET_PLAYERS_BY_TEAM, {
     variables: { teamId: currentTeamId },
     skip: !currentTeamId
   });
-  
+
   const players: PlayerProfile[] = data?.playersByTeam || [];
-  
+
   const [activeTab, setActiveTab] = useState('new');
   const [selectedPlayer, setSelectedPlayer] = useState<PlayerProfile | null>(null);
   const [selectedBattery, setSelectedBattery] = useState<TestBattery | null>(null);
@@ -64,6 +64,7 @@ export default function EvaluationDashboard() {
   const handleCloseWizard = () => {
     setSelectedPlayer(null);
     setSelectedBattery(null);
+    void refetch();
   };
 
   // Show message if no team selected
@@ -208,7 +209,7 @@ function PlayerEvaluationCard({ player, onStartEvaluation }: PlayerEvaluationCar
   // Get evaluation history from GraphQL
   const { data: historyData, loading } = useEvaluationHistory(player.id);
   const evaluations = historyData?.evaluationHistory || [];
-  const lastEval = evaluations.length > 0 ? evaluations[evaluations.length - 1] : null;
+  const lastEval = evaluations.length > 0 ? evaluations[0] : null;
 
   // Get recommended battery based on position
   const recommendedBatteries = TEST_BATTERIES.filter(
@@ -240,7 +241,7 @@ function PlayerEvaluationCard({ player, onStartEvaluation }: PlayerEvaluationCar
               {player.primaryPosition} • #{player.jerseyNumber}
             </p>
             <Badge variant="outline" className="mt-1">
-              Note: {player.currentEvaluation?.overallRating || 'N/A'}
+              Note: {player.currentRating ?? 'Non noté'}
             </Badge>
           </div>
         </div>

@@ -1,11 +1,7 @@
 import { ObjectType, Field, ID, registerEnumType } from 'type-graphql';
 
-export enum TeamLevel {
-  YOUTH = 'YOUTH',
-  JUNIOR = 'JUNIOR',
-  SENIOR = 'SENIOR',
-  ELITE = 'ELITE'
-}
+import { TeamLevel } from '@prisma/client';
+export { TeamLevel };
 
 registerEnumType(TeamLevel, {
   name: 'TeamLevel',
@@ -21,16 +17,16 @@ export class Team {
   name!: string;
 
   @Field(() => String, { nullable: true })
-  description?: string;
+  description?: string | null;
 
   @Field(() => TeamLevel)
   level!: TeamLevel;
 
   @Field(() => String, { nullable: true })
-  season?: string;
+  season?: string | null;
 
   @Field(() => String, { nullable: true })
-  avatar?: string;
+  avatar?: string | null;
 
   @Field(() => String)
   coachId!: string;
@@ -46,11 +42,11 @@ export class Team {
 
   // Player count (computed field)
   @Field(() => Number, { nullable: true })
-  playerCount?: number;
+  playerCount?: number | null;
 
   // Team progression percentage (computed field)
   @Field(() => Number, { nullable: true })
-  teamProgression?: number;
+  teamProgression?: number | null;
 }
 
 @ObjectType()
@@ -71,14 +67,14 @@ export class SimplePlayer {
   lastName!: string;
 
   @Field(() => String, { nullable: true })
-  avatar?: string;
+  avatar?: string | null;
 
   @Field(() => Number, { nullable: true })
-  jerseyNumber?: number;
+  jerseyNumber?: number | null;
 
   @Field(() => String, { nullable: true })
-  primaryPosition?: string;
+  primaryPosition?: string | null;
 
   @Field(() => Number, { nullable: true })
-  currentRating?: number;
+  currentRating?: number | null;
 }

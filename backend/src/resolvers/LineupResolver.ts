@@ -1,6 +1,7 @@
+import { rosterWhere } from '../utils/roster';
 import { Resolver, Query, Mutation, Arg, ID } from 'type-graphql';
 import { injectable, inject } from 'tsyringe';
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, Position } from '@prisma/client';
 import { Lineup, SaveLineupInput } from '../types/Lineup.types';
 
 @injectable()
@@ -31,8 +32,14 @@ export class LineupResolver {
 
   @Mutation(() => Lineup, { description: 'Save a lineup (creates or updates)' })
   async saveLineup(@Arg('input', () => SaveLineupInput) input: SaveLineupInput): Promise<Lineup> {
+    const positions = input.positions as any;
+    if (!Array.isArray(positions) || positions.length>6 || positions.some(p=>!p || !Number.isInteger(p.courtPosition) || p.courtPosition<1 || p.courtPosition>6 || !Object.values(Position).includes(p.position)) || new Set(positions.map(p=>p.courtPosition)).size!==positions.length) throw new Error('Composition invalide.');
+    const ids=positions.filter(p=>p.player).map(p=>p.player.id);
+    if(ids.some(id=>typeof id!=='string') || new Set(ids).size!==ids.length || await this.prisma.player.count({where:{id:{in:ids},...rosterWhere(input.teamId)}})!==ids.length)throw new Error('Chaque joueur doit appartenir à cette équipe et occuper une seule place.');
+    return this.prisma.$transaction(async tx => {
+      await tx.$queryRaw`SELECT id FROM teams WHERE id = ${input.teamId} FOR UPDATE`;
     // Deactivate all other lineups for this team
-    await this.prisma.lineup.updateMany({
+    await tx.lineup.updateMany({
       where: {
         teamId: input.teamId,
         isActive: true
@@ -41,7 +48,7 @@ export class LineupResolver {
     });
 
     // Create or update the active lineup
-    const existing = await this.prisma.lineup.findFirst({
+    const existing = await tx.lineup.findFirst({
       where: {
         teamId: input.teamId,
         name: input.name || 'Default Lineup'
@@ -49,7 +56,7 @@ export class LineupResolver {
     });
 
     if (existing) {
-      return this.prisma.lineup.update({
+      return tx.lineup.update({
         where: { id: existing.id },
         data: {
           positions: input.positions,
@@ -59,13 +66,14 @@ export class LineupResolver {
       });
     }
 
-    return this.prisma.lineup.create({
+    return tx.lineup.create({
       data: {
         teamId: input.teamId,
         name: input.name || 'Default Lineup',
         positions: input.positions,
         isActive: true
       }
+    });
     });
   }
 

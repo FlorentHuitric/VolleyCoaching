@@ -32,26 +32,19 @@ export default function SignupPage() {
 
     // Validation
     if (formData.password !== formData.confirmPassword) {
-      toast.error('Passwords do not match');
+      toast.error('Les mots de passe ne correspondent pas');
       return;
     }
 
-    if (formData.password.length < 8) {
-      toast.error('Password must be at least 8 characters long');
+    if (formData.password.length < 12) {
+      toast.error('Le mot de passe doit contenir au moins 12 caractères');
       return;
     }
 
     setIsLoading(true);
 
     try {
-      // For now, we'll create a placeholder orgId
-      // In production, you'd want to:
-      // 1. Create the organization first
-      // 2. Or let user select from existing organizations
-      // 3. Or have a separate onboarding flow
-
-      // Temporary: create organization name-based ID
-      const tempOrgId = 'temp-org-' + Date.now();
+      // Registration creates a separate organization for this administrator.
 
       await signup({
         email: formData.email,
@@ -59,33 +52,33 @@ export default function SignupPage() {
         password: formData.password,
         firstName: formData.firstName,
         lastName: formData.lastName,
-        orgId: tempOrgId,
+        orgName: formData.orgName,
       });
 
-      toast.success('Account created successfully!');
+      toast.success('Votre espace est créé.');
 
       // Small delay to ensure state is updated before redirect
       setTimeout(() => {
-        router.push('/teams');
+        router.push('/team');
       }, 100);
     } catch (error: any) {
       console.error('Signup error:', error);
-      toast.error(error.message || 'Signup failed. Please try again.');
+      toast.error(error.message || 'Inscription impossible. Veuillez réessayer.');
       setIsLoading(false);
     }
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 px-4 py-12 dark:from-gray-900 dark:to-gray-800">
+    <div className="flex min-h-screen items-center justify-center astren-auth px-4 py-12">
       <div className="w-full max-w-md">
-        <div className="rounded-2xl bg-white p-8 shadow-2xl dark:bg-gray-800">
+        <div className="astren-auth-card rounded-2xl p-6 sm:p-8">
           {/* Header */}
           <div className="mb-8 text-center">
             <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
               VolleyCoaching
             </h1>
             <p className="mt-2 text-gray-600 dark:text-gray-400">
-              Create your coach account
+              Créez votre espace de coaching
             </p>
           </div>
 
@@ -97,7 +90,7 @@ export default function SignupPage() {
                   htmlFor="firstName"
                   className="block text-sm font-medium text-gray-700 dark:text-gray-300"
                 >
-                  First Name
+                  Prénom
                 </label>
                 <input
                   id="firstName"
@@ -117,7 +110,7 @@ export default function SignupPage() {
                   htmlFor="lastName"
                   className="block text-sm font-medium text-gray-700 dark:text-gray-300"
                 >
-                  Last Name
+                  Nom
                 </label>
                 <input
                   id="lastName"
@@ -158,7 +151,7 @@ export default function SignupPage() {
                 htmlFor="username"
                 className="block text-sm font-medium text-gray-700 dark:text-gray-300"
               >
-                Username
+                Identifiant
               </label>
               <input
                 id="username"
@@ -178,7 +171,7 @@ export default function SignupPage() {
                 htmlFor="orgName"
                 className="block text-sm font-medium text-gray-700 dark:text-gray-300"
               >
-                Organization / Club Name
+                Nom de votre club
               </label>
               <input
                 id="orgName"
@@ -188,7 +181,7 @@ export default function SignupPage() {
                 onChange={handleChange}
                 required
                 className="mt-1 block w-full rounded-lg border border-gray-300 px-4 py-2 text-gray-900 placeholder-gray-500 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-                placeholder="My Volleyball Club"
+                placeholder="Mon club de volley"
                 disabled={isLoading}
               />
             </div>
@@ -198,7 +191,7 @@ export default function SignupPage() {
                 htmlFor="password"
                 className="block text-sm font-medium text-gray-700 dark:text-gray-300"
               >
-                Password
+                Mot de passe
               </label>
               <input
                 id="password"
@@ -207,13 +200,13 @@ export default function SignupPage() {
                 value={formData.password}
                 onChange={handleChange}
                 required
-                minLength={8}
+                minLength={12}
                 className="mt-1 block w-full rounded-lg border border-gray-300 px-4 py-2 text-gray-900 placeholder-gray-500 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
                 placeholder="••••••••"
                 disabled={isLoading}
               />
               <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                Minimum 8 characters
+                Minimum 12 caractères
               </p>
             </div>
 
@@ -222,7 +215,7 @@ export default function SignupPage() {
                 htmlFor="confirmPassword"
                 className="block text-sm font-medium text-gray-700 dark:text-gray-300"
               >
-                Confirm Password
+                Confirmer le mot de passe
               </label>
               <input
                 id="confirmPassword"
@@ -264,22 +257,22 @@ export default function SignupPage() {
                       d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                     />
                   </svg>
-                  Creating account...
+                  Création en cours…
                 </span>
               ) : (
-                'Create account'
+                'Créer mon espace'
               )}
             </button>
           </form>
 
           {/* Footer */}
           <div className="mt-6 text-center text-sm text-gray-600 dark:text-gray-400">
-            Already have an account?{' '}
+            Déjà inscrit ?{' '}
             <Link
               href="/login"
               className="font-semibold text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
             >
-              Sign in
+              Se connecter
             </Link>
           </div>
         </div>

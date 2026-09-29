@@ -9,7 +9,7 @@ interface PlayerExportData {
   firstName: string;
   lastName: string;
   primaryPosition: string;
-  jerseyNumber: number;
+  jerseyNumber: number | null;
   height?: number | null;
   weight?: number | null;
   currentRating?: number | null;
@@ -19,7 +19,7 @@ interface PlayerExportData {
   currentMental?: any;
   strengths: string[];
   weaknesses: string[];
-  dateOfBirth: Date;
+  dateOfBirth: Date | null;
 }
 
 @injectable()
@@ -67,7 +67,7 @@ export class ExportService {
 
       const info = [
         ['Poste', player.primaryPosition],
-        ['Numéro', `#${player.jerseyNumber}`],
+        ['Numéro', player.jerseyNumber == null ? 'Non renseigné' : `#${player.jerseyNumber}`],
         ['Équipe', player.team.name],
         ['Taille', player.height ? `${player.height} cm` : 'N/A'],
         ['Poids', player.weight ? `${player.weight} kg` : 'N/A'],
@@ -80,6 +80,7 @@ export class ExportService {
       }
       doc.moveDown();
 
+      if (player.assessmentKind === 'ESTIMATED') doc.fontSize(10).text('Notes provisoires estimees, a confirmer par le coach.').moveDown();
       // Overall Rating
       if (player.currentRating) {
         doc.fontSize(14).font('Helvetica-Bold').text('Note Globale');

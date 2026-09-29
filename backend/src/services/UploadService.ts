@@ -73,7 +73,13 @@ export class UploadService {
       await this.minioClient.setBucketPolicy(this.bucketName, JSON.stringify(policy));
     }
 
-    const fileExtension = file.originalname.split('.').pop();
+    const extensions: Record<string, string> = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' };
+    const fileExtension = extensions[file.mimetype];
+    const header = file.buffer;
+    const valid = file.mimetype === 'image/jpeg' ? header[0] === 0xff && header[1] === 0xd8 && header[2] === 0xff
+      : file.mimetype === 'image/png' ? header.subarray(0,8).equals(Buffer.from([137,80,78,71,13,10,26,10]))
+      : file.mimetype === 'image/webp' && header.toString('ascii',0,4) === 'RIFF' && header.toString('ascii',8,12) === 'WEBP';
+    if (!fileExtension || !valid) throw new Error('Invalid image content');
     const fileName = `${uuidv4()}.${fileExtension}`;
 
     await this.minioClient.putObject(

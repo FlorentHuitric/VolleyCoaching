@@ -1,0 +1,32 @@
+# ============================================
+# VolleyCoaching Backend - Production Build
+# Node.js/Express + Apollo GraphQL + Prisma
+# Uses tsx for runtime TypeScript execution
+# ============================================
+
+FROM node:20-alpine
+
+# Install PostgreSQL client and OpenSSL for Prisma
+RUN apk add --no-cache postgresql-client openssl openssl-dev
+
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+
+# Install all dependencies (tsx needed at runtime)
+RUN npm ci
+
+# Copy source code
+COPY . .
+
+# Generate Prisma Client
+RUN npx prisma generate
+
+# Copy production entrypoint
+COPY docker-entrypoint.prod.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+
+EXPOSE 3001
+
+ENTRYPOINT ["docker-entrypoint.sh"]

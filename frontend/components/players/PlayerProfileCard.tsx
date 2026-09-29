@@ -1,6 +1,6 @@
 'use client';
 
-import { PlayerProfile } from '@/types/player-evaluation';
+import { PlayerProfile } from '@/types/player';
 import { getPositionColor, getPositionAbbreviation } from '@/utils/volleyballUtils';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -77,7 +77,7 @@ export default function PlayerProfileCard({ player, compact = false }: PlayerPro
             <div className="relative">
               <Avatar className="h-16 w-16 border-4 border-white shadow-lg">
                 <AvatarImage
-                  src={player.avatar}
+                  src={player.avatar || undefined}
                   alt={`${player.firstName} ${player.lastName}`}
                 />
                 <AvatarFallback

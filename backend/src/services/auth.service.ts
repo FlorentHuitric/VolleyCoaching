@@ -9,6 +9,8 @@ export interface JwtPayload {
   email: string;
   role: Role;
   orgId: string;
+  issuedAtMs?: number;
+  iat?: number;
 }
 
 // Token pair structure
@@ -33,6 +35,7 @@ export class AuthService {
   private prisma: PrismaClient;
 
   constructor() {
+    if (process.env.NODE_ENV === 'production' && (!process.env.JWT_ACCESS_SECRET || !process.env.JWT_REFRESH_SECRET)) throw new Error('JWT secrets required in production');
     // Resolve PrismaClient from container manually to avoid DI resolution issues
     this.prisma = container.resolve(PrismaClient);
 
@@ -62,11 +65,11 @@ export class AuthService {
    * Generate access and refresh tokens
    */
   generateTokens(payload: JwtPayload): TokenPair {
-    const accessToken = jwt.sign(payload, this.ACCESS_TOKEN_SECRET, {
+    const accessToken = jwt.sign({ ...payload, issuedAtMs: Date.now() }, this.ACCESS_TOKEN_SECRET, {
       expiresIn: this.ACCESS_TOKEN_EXPIRY,
     });
 
-    const refreshToken = jwt.sign(payload, this.REFRESH_TOKEN_SECRET, {
+    const refreshToken = jwt.sign({ ...payload, issuedAtMs: Date.now() }, this.REFRESH_TOKEN_SECRET, {
       expiresIn: this.REFRESH_TOKEN_EXPIRY,
     });
 
@@ -105,7 +108,7 @@ export class AuthService {
     firstName: string;
     lastName: string;
     role?: Role;
-    orgId: string;
+    orgName: string;
   }): Promise<AuthResult> {
     // Check if user already exists
     const existingUser = await this.prisma.user.findFirst({
@@ -124,29 +127,17 @@ export class AuthService {
       throw new Error('Username already taken');
     }
 
-    // Verify organization exists
-    const organization = await this.prisma.organization.findUnique({
-      where: { id: input.orgId },
-    });
-
-    if (!organization) {
-      throw new Error('Organization not found');
-    }
-
-    // Hash password
+    const orgName = input.orgName?.trim();
+    if (!orgName || orgName.length > 120) throw new Error('Indiquez le nom de votre organisation.');
+    if (input.password.length < 12 || input.password.length > 72) throw new Error('Le mot de passe doit contenir entre 12 et 72 caractères.');
     const hashedPassword = await this.hashPassword(input.password);
-
-    // Create user
-    const user = await this.prisma.user.create({
-      data: {
-        email: input.email,
-        username: input.username,
-        password: hashedPassword,
-        firstName: input.firstName,
-        lastName: input.lastName,
-        role: input.role || Role.COACH,
-        orgId: input.orgId,
-      },
+    const user = await this.prisma.$transaction(async tx => {
+      const organization = await tx.organization.create({ data: { name: orgName } });
+      return tx.user.create({ data: {
+        email: input.email.trim().toLowerCase(), username: input.username.trim(),
+        password: hashedPassword, firstName: input.firstName.trim(), lastName: input.lastName.trim(),
+        role: Role.ADMIN, orgId: organization.id,
+      } });
     });
 
     // Generate tokens
@@ -223,8 +214,8 @@ export class AuthService {
       where: { id: payload.userId },
     });
 
-    if (!user) {
-      throw new Error('User not found');
+    if (!user || (payload.issuedAtMs ?? (payload.iat || 0) * 1000) < user.updatedAt.getTime()) {
+      throw new Error('User not found or session revoked');
     }
 
     // Generate new token pair
@@ -250,7 +241,7 @@ export class AuthService {
       where: { id: payload.userId },
     });
 
-    if (!user) {
+    if (!user || (payload.issuedAtMs ?? (payload.iat || 0) * 1000) < user.updatedAt.getTime()) {
       return null;
     }
 
@@ -258,14 +249,25 @@ export class AuthService {
     return userWithoutPassword;
   }
 
+  async changePassword(userId: string, currentPassword: string, newPassword: string): Promise<boolean> {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user || !await this.comparePassword(currentPassword, user.password)) throw new Error('Mot de passe actuel incorrect.');
+    if (newPassword.length < 12 || Buffer.byteLength(newPassword, 'utf8') > 72) throw new Error('Choisissez au moins 12 caractères (72 octets maximum).');
+    await this.prisma.user.update({ where: { id: userId }, data: { password: await this.hashPassword(newPassword) } });
+    return true;
+  }
+
   /**
    * Validate that a user owns a resource
    */
   async validateUserOwnsTeam(userId: string, teamId: string): Promise<boolean> {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) return false;
     const team = await this.prisma.team.findFirst({
       where: {
         id: teamId,
-        coachId: userId,
+        orgId: user.orgId,
+        ...(user.role === Role.ADMIN ? {} : { coachId: userId }),
       },
     });
 
@@ -276,12 +278,13 @@ export class AuthService {
    * Validate that a user owns a player (through team ownership)
    */
   async validateUserOwnsPlayer(userId: string, playerId: string): Promise<boolean> {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) return false;
     const player = await this.prisma.player.findFirst({
       where: {
         id: playerId,
-        team: {
-          coachId: userId,
-        },
+        orgId: user.orgId,
+        team: user.role === Role.ADMIN ? { orgId: user.orgId } : { coachId: userId },
       },
     });
 

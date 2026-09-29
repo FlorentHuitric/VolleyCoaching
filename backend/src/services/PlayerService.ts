@@ -1,5 +1,7 @@
+import { assessmentUpdate } from '../utils/assessment';
+import { rosterWhere } from '../utils/roster';
 import { injectable, inject } from 'tsyringe';
-import { PrismaClient, Player, PlayerStatus, ContractLevel, Position } from '@prisma/client';
+import { PrismaClient, Prisma, Player, PlayerStatus, ContractLevel, Position } from '@prisma/client';
 import { RedisService } from './RedisService';
 
 /**
@@ -24,12 +26,17 @@ export class PlayerService {
    * Create a new player
    */
   async createPlayer(data: {
+    experienceLevel?: string;
+    notes?: string;
+    medicalNotes?: string;
+    emergencyContact?: string;
+    emergencyPhone?: string;
     firstName: string;
     lastName: string;
-    dateOfBirth: Date;
+    dateOfBirth?: Date | null;
     nationality: string;
     primaryPosition: Position;
-    jerseyNumber: number;
+    jerseyNumber?: number | null;
     teamId: string;
     orgId: string;
     email?: string;
@@ -46,7 +53,7 @@ export class PlayerService {
     contractLevel?: ContractLevel;
   }): Promise<Player> {
     // Validate jersey number uniqueness within team
-    const existing = await this.prisma.player.findUnique({
+    const existing = data.jerseyNumber == null ? null : await this.prisma.player.findUnique({
       where: {
         teamId_jerseyNumber: {
           teamId: data.teamId,
@@ -111,11 +118,10 @@ export class PlayerService {
    */
   async getPlayersByTeam(teamId: string): Promise<Player[]> {
     const cacheKey = `players:team:${teamId}`;
-    const cached = await this.redis.get<Player[]>(cacheKey);
-    if (cached) return cached;
+    // Player evaluations must be visible immediately; avoid a stale JSON snapshot.
 
     const players = await this.prisma.player.findMany({
-      where: { teamId },
+      where: rosterWhere(teamId),
       include: {
         evaluations: {
           orderBy: { evaluationDate: 'desc' },
@@ -128,7 +134,7 @@ export class PlayerService {
       ],
     });
 
-    await this.redis.set(cacheKey, players, 120); // 2 min cache
+
     return players;
   }
 
@@ -156,7 +162,7 @@ export class PlayerService {
    */
   async updatePlayer(
     id: string,
-    data: Partial<Omit<Player, 'id' | 'createdAt' | 'updatedAt'>>
+    data: Partial<Omit<Player, 'id' | 'createdAt' | 'updatedAt'>> & { assessment?: unknown }
   ): Promise<Player> {
     // If jersey number is being updated, validate uniqueness
     if (data.jerseyNumber) {
@@ -183,7 +189,7 @@ export class PlayerService {
 
     const updated = await this.prisma.player.update({
       where: { id },
-      data,
+      data: await this.profileUpdate(id, data),
       include: {
         team: true,
         evaluations: {
@@ -193,8 +199,14 @@ export class PlayerService {
       },
     });
 
-    await this.redis.invalidatePattern(`players:team:${updated.teamId}`);
+    await Promise.all([updated.teamId,...updated.rosterTeamIds].map(id=>this.redis.invalidatePattern(`players:team:${id}`)));
     return updated;
+  }
+
+  private async profileUpdate(id: string, data: Partial<Player> & { assessment?: unknown }): Promise<Prisma.PlayerUncheckedUpdateInput> {
+    const {assessment, ...fields}=data;
+    const player=await this.prisma.player.findUniqueOrThrow({where:{id}});
+    return {...fields, ...(assessment!=null?assessmentUpdate(player,assessment):{})} as Prisma.PlayerUncheckedUpdateInput;
   }
 
   /**
@@ -236,7 +248,7 @@ export class PlayerService {
   async getPlayersByPosition(position: Position, teamId: string): Promise<Player[]> {
     return this.prisma.player.findMany({
       where: {
-        teamId,
+        AND: [rosterWhere(teamId)],
         OR: [
           { primaryPosition: position },
           { secondaryPosition: position },
@@ -256,7 +268,7 @@ export class PlayerService {
    */
   async getPlayersByStatus(status: PlayerStatus, teamId: string): Promise<Player[]> {
     return this.prisma.player.findMany({
-      where: { teamId, status },
+      where: { ...rosterWhere(teamId), status },
       include: {
         evaluations: {
           where: { isCurrent: true },

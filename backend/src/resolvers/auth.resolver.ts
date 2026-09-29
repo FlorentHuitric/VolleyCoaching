@@ -51,7 +51,7 @@ export class AuthResolver {
         password: input.password,
         firstName: input.firstName,
         lastName: input.lastName,
-        orgId: input.orgId,
+        orgName: input.orgName,
       });
       return {
         user: result.user as any,
@@ -90,6 +90,12 @@ export class AuthResolver {
     @CurrentUser() user: UserType
   ): Promise<UserType> {
     return user;
+  }
+
+  @UseMiddleware(Authenticated())
+  @Mutation(() => Boolean)
+  async changePassword(@CurrentUser() user: UserType, @Arg('currentPassword', () => String) currentPassword: string, @Arg('newPassword', () => String) newPassword: string): Promise<boolean> {
+    return this.authService.changePassword(user.id, currentPassword, newPassword);
   }
 
   /**

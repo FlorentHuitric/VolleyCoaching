@@ -58,7 +58,7 @@ export class SignupInput {
   lastName!: string;
 
   @Field(() => String)
-  orgId!: string;
+  orgName!: string;
 }
 
 /**

@@ -1,14 +1,8 @@
-import {
-  PlayerEvaluation,
-  PlayerProfile,
-  SkillRating,
-  TechnicalSkills,
-  PhysicalAttributes,
-  MentalAttributes,
-  PositionSpecificSkills,
-  PerformanceAnalytics,
-  EvaluationTemplate
-} from '@/types/player-evaluation';
+import { EvaluationType, TechnicalSkills, PhysicalAttributes, MentalAttributes, SkillRating } from '@/types/player';
+type PositionSpecificSkills = Partial<Record<Lowercase<VolleyballPosition>, Record<string, number>>>;
+interface PlayerEvaluation extends EvaluationType { position: VolleyballPosition; positionSpecific: PositionSpecificSkills; }
+interface PlayerProfile { id: string; currentEvaluation?: PlayerEvaluation; evaluationHistory: PlayerEvaluation[]; }
+
 import { VolleyballPosition } from '@/hooks/useCourtStore';
 
 // SOLID Principles: Single Responsibility & Interface Segregation
@@ -201,7 +195,7 @@ export class PerformanceAnalyticsGenerator {
   static generateAnalytics(
     profile: PlayerProfile,
     teamAverages?: Record<string, number>
-  ): PerformanceAnalytics {
+  ) {
     const evaluationHistory = profile.evaluationHistory;
     const currentEvaluation = profile.currentEvaluation;
 
@@ -236,12 +230,12 @@ export class PerformanceAnalyticsGenerator {
     ];
 
     keySkills.forEach(skill => {
-      const data = history.map(eval => ({
-        date: eval.evaluationDate,
-        rating: skill === 'overall' ? eval.overallRating :
-                skill === 'physical' ? OverallRatingCalculator.calculatePhysicalScore(eval.physical, eval.position) :
-                skill === 'mental' ? OverallRatingCalculator.calculateMentalAverage(eval.mental) :
-                this.getSkillRating(eval, skill)
+      const data = history.map(entry => ({
+        date: entry.evaluationDate,
+        rating: skill === 'overall' ? entry.overallRating :
+                skill === 'physical' ? OverallRatingCalculator.calculatePhysicalScore(entry.physical, entry.position) :
+                skill === 'mental' ? OverallRatingCalculator.calculateMentalAverage(entry.mental) :
+                this.getSkillRating(entry, skill)
       }));
 
       const trend = SkillRatingUtils.calculateTrend(data);
@@ -275,7 +269,7 @@ export class PerformanceAnalyticsGenerator {
         physical,
         mental,
         positionSpecific,
-        evaluation.mental.communication.verbal,
+        evaluation.mental.communication.clarity,
         evaluation.mental.leadership.onCourtPresence
       ],
       potential: [
@@ -283,7 +277,7 @@ export class PerformanceAnalyticsGenerator {
         Math.min(10, physical + 1),
         Math.min(10, mental + 2),
         Math.min(10, positionSpecific + 1.5),
-        Math.min(10, evaluation.mental.communication.verbal + 2),
+        Math.min(10, evaluation.mental.communication.clarity + 2),
         Math.min(10, evaluation.mental.leadership.onCourtPresence + 1.5)
       ],
       target: [8, 7, 8, 8, 7, 7] // Reasonable targets

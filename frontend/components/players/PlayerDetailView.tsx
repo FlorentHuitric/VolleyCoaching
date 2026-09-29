@@ -35,12 +35,12 @@ interface PlayerDetailViewProps {
 
 export default function PlayerDetailView({ playerId }: PlayerDetailViewProps) {
   const [activeTab, setActiveTab] = useState("overview");
-  
+
   // Fetch player via Apollo Client
   const { data, loading, error } = useQuery(GET_PLAYER, {
     variables: { id: playerId }
   });
-  
+
   const player: PlayerType | undefined = data?.player;
 
   if (loading) {
@@ -72,7 +72,8 @@ export default function PlayerDetailView({ playerId }: PlayerDetailViewProps) {
   // Player data now comes from store
 
   // Helper functions
-  const calculateAge = (dateOfBirth: Date) => {
+  const calculateAge = (dateOfBirth: Date | null) => {
+    if (!dateOfBirth) return null;
     const today = new Date();
     const age = today.getFullYear() - dateOfBirth.getFullYear();
     const monthDifference = today.getMonth() - dateOfBirth.getMonth();
@@ -359,7 +360,7 @@ export default function PlayerDetailView({ playerId }: PlayerDetailViewProps) {
   const textColors = getTextColors(currentEval.overallRating);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
+    <div className="min-h-screen astren-workspace">
       {/* Header */}
       <header className="bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b shadow-sm sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
@@ -488,7 +489,7 @@ export default function PlayerDetailView({ playerId }: PlayerDetailViewProps) {
                     <div className="space-y-3">
                       <Badge className="bg-white/20 text-white border-white/30 px-4 py-2 text-lg font-bold">
                         <Calendar className="w-5 h-5 mr-2" />
-                        {age} ans
+                        {age === null ? 'Âge non renseigné' : `${age} ans`}
                       </Badge>
                       <Badge className="bg-white/20 text-white border-white/30 px-4 py-2 text-lg font-bold">
                         <Users className="w-5 h-5 mr-2" />

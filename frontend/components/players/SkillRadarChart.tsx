@@ -1,6 +1,6 @@
 'use client';
 
-import { TechnicalSkills, PhysicalAttributes, MentalAttributes, SkillRating } from '@/types/player-evaluation';
+import { TechnicalSkills, PhysicalAttributes, MentalAttributes, SkillRating } from '@/types/player';
 
 interface SkillRadarChartProps {
   data: {

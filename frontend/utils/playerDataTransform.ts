@@ -1,4 +1,4 @@
-import { PlayerProfile } from '@/types/player-evaluation';
+import { PlayerProfile } from '@/types/player';
 import { VolleyballPosition } from '@/hooks/useCourtStore';
 
 /**
@@ -41,26 +41,7 @@ export function transformAPIPlayerToProfile(apiPlayer: any): PlayerProfile {
     evaluationDate: new Date(evaluation.evaluationDate)
   })) || [];
 
-  return {
-    id: apiPlayer.id,
-    personalInfo: {
-      firstName: apiPlayer.firstName,
-      lastName: apiPlayer.lastName,
-      dateOfBirth: new Date(apiPlayer.dateOfBirth),
-      jerseyNumber: apiPlayer.jerseyNumber,
-      preferredName: apiPlayer.preferredName || apiPlayer.lastName,
-      avatar: apiPlayer.avatar || undefined
-    },
-    nationality: apiPlayer.nationality,
-    primaryPosition: position,
-    secondaryPositions: apiPlayer.secondaryPosition ? [apiPlayer.secondaryPosition as VolleyballPosition] : [],
-    status: mapPlayerStatus(apiPlayer.status),
-    contractLevel: mapContractLevel(apiPlayer.contractLevel),
-    createdAt: new Date(apiPlayer.createdAt),
-    updatedAt: new Date(apiPlayer.updatedAt),
-    evaluationHistory,
-    currentEvaluation
-  };
+  return {...apiPlayer, dateOfBirth:apiPlayer.dateOfBirth ? new Date(apiPlayer.dateOfBirth) : null, createdAt:new Date(apiPlayer.createdAt), updatedAt:new Date(apiPlayer.updatedAt), evaluations:apiPlayer.evaluations || [], currentEvaluation:apiPlayer.evaluations?.[0] || null};
 }
 
 /**
@@ -121,54 +102,14 @@ function transformPositionToBackend(position?: string): string | null {
 /**
  * Transform PlayerProfile to API CreatePlayerInput format
  */
-export function transformProfileToCreateInput(profile: Partial<PlayerProfile> & { nationality?: string; dominantHand?: string; teamId?: string }): any {
-  return {
-    firstName: profile.personalInfo?.firstName,
-    lastName: profile.personalInfo?.lastName,
-    preferredName: profile.personalInfo?.preferredName,
-    dateOfBirth: profile.personalInfo?.dateOfBirth,
-    nationality: profile.nationality || 'France',
-    jerseyNumber: profile.personalInfo?.jerseyNumber,
-    primaryPosition: transformPositionToBackend(profile.primaryPosition),
-    secondaryPosition: transformPositionToBackend(profile.secondaryPositions?.[0]),
-    dominantHand: profile.dominantHand || 'RIGHT',
-    yearsOfExperience: 0, // TODO: Calculate from data
-    height: profile.currentEvaluation?.physical?.measurements?.height,
-    weight: profile.currentEvaluation?.physical?.measurements?.weight,
-    armReach: profile.currentEvaluation?.physical?.measurements?.reach,
-    wingspan: profile.currentEvaluation?.physical?.measurements?.wingspan,
-    status: (profile.status?.toUpperCase() || 'ACTIVE') as any,
-    contractLevel: (profile.contractLevel?.toUpperCase() || 'TRIAL') as any,
-    // joinDate removed - not in CreatePlayerInput schema
-    avatar: profile.personalInfo?.avatar,
-    teamId: profile.teamId || 'team-elite-squad', // From form or default team
-    orgId: 'org-volleycoaching-demo' // Default organization
-  };
+export function transformProfileToCreateInput(profile: Partial<PlayerProfile> & { teamId: string; orgId: string }) {
+  if (!profile.teamId || !profile.orgId) throw new Error('Une équipe et une organisation sont nécessaires.');
+  return { ...transformProfileToUpdateInput(profile), teamId: profile.teamId, orgId: profile.orgId };
 }
 
-/**
- * Transform PlayerProfile to API UpdatePlayerInput format
- */
-export function transformProfileToUpdateInput(profile: Partial<PlayerProfile>): any {
-  const input: any = {};
-
-  if (profile.personalInfo?.firstName) input.firstName = profile.firstName;
-  if (profile.personalInfo?.lastName) input.lastName = profile.lastName;
-  if (profile.personalInfo?.jerseyNumber) input.jerseyNumber = profile.jerseyNumber;
-  if (profile.primaryPosition) input.primaryPosition = transformPositionToBackend(profile.primaryPosition);
-  if (profile.secondaryPositions) input.secondaryPosition = transformPositionToBackend(profile.secondaryPositions[0]);
-  if (profile.status) input.status = profile.status.toUpperCase();
-  if (profile.contractLevel) input.contractLevel = profile.contractLevel.toUpperCase();
-  if (profile.personalInfo?.avatar) input.avatar = profile.avatar;
-
-  // Physical measurements
-  if (profile.currentEvaluation?.physical?.measurements) {
-    const m = profile.currentEvaluation.physical.measurements;
-    if (m.height) input.height = m.height;
-    if (m.weight) input.weight = m.weight;
-    if (m.reach) input.armReach = m.reach;
-    if (m.wingspan) input.wingspan = m.wingspan;
-  }
-
+export function transformProfileToUpdateInput(profile: Partial<PlayerProfile>) {
+  const input: Record<string, unknown> = {};
+  const fields = ['firstName', 'lastName', 'preferredName', 'dateOfBirth', 'nationality', 'jerseyNumber', 'primaryPosition', 'secondaryPosition', 'dominantHand', 'yearsOfExperience', 'height', 'weight', 'armReach', 'wingspan', 'status', 'contractLevel', 'avatar'] as const;
+  for (const key of fields) if (profile[key] !== undefined) input[key] = profile[key];
   return input;
 }

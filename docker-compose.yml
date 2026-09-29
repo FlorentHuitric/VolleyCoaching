@@ -1,67 +1,59 @@
-services:
-  # Nginx Reverse Proxy
-  nginx:
-    image: nginx:alpine
-    ports:
-      - "80:80"
-    volumes:
-      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-    depends_on:
-      - frontend
-      - backend
-      - adminer
-      - minio
-    networks:
-      - volleycoaching-network
-    restart: unless-stopped
+# ============================================
+# VolleyCoaching - Production Docker Compose
+# Traefik reverse proxy + Let's Encrypt SSL
+# Domain: coach.florent-huitric.fr
+# ============================================
 
+services:
   # Frontend Next.js
   frontend:
+    container_name: volleycoaching-frontend
     build:
       context: ./frontend
-      dockerfile: Dockerfile
-    expose:
-      - "3000"
+      dockerfile: Dockerfile.prod
+      args:
+        NEXT_PUBLIC_GRAPHQL_URL: https://api-coach.florent-huitric.fr/graphql
+        NEXT_PUBLIC_API_URL: https://api-coach.florent-huitric.fr
+    restart: always
     environment:
-      - NODE_ENV=development
-      - NEXT_PUBLIC_API_URL=http://api.localhost
-      - NEXT_PUBLIC_GRAPHQL_URL=http://api.localhost/graphql
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
-      - /app/.next
+      NODE_ENV: production
     depends_on:
       - backend
     networks:
-      - volleycoaching-network
-    restart: unless-stopped
+      - volleycoaching_net
+      - proxy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.volleycoaching-frontend.rule=Host(`coach.florent-huitric.fr`)"
+      - "traefik.http.routers.volleycoaching-frontend.entrypoints=websecure"
+      - "traefik.http.routers.volleycoaching-frontend.tls.certresolver=letsencrypt"
+      - "traefik.http.services.volleycoaching-frontend.loadbalancer.server.port=3000"
 
-  # Backend API (Node.js/Express + Apollo GraphQL + Prisma)
+  # Backend API (Express + Apollo GraphQL + Prisma)
   backend:
+    container_name: volleycoaching-backend
     build:
       context: ./backend
-      dockerfile: Dockerfile
-    expose:
-      - "3001"
-    ports:
-      - "3001:3001"
-      - "5555:5555"  # Prisma Studio
+      dockerfile: Dockerfile.prod
+    restart: always
+    env_file:
+      - .env
     environment:
-      - NODE_ENV=development
-      - DATABASE_URL=postgresql://volleyuser:volleypass@postgres:5432/volleycoaching
-      - JWT_ACCESS_SECRET=zOurPfmdaii2M5G7xD6720ez/9Zp9xzffkkSzvRpcQmy6jq7KKdZXdZJhLP+h15JqIp/h4hl67S1DGq2Oy6+Tg==
-      - JWT_REFRESH_SECRET=/1VsxWMNqy8U+L4avKQeQE7Y05Nt1wQ2YFpxVOzqydVPc5M8wSG14m2+zBI70k3qprJbW/z9U009WYfMeJUdRg==
-      - REDIS_URL=redis://redis:6379
-      - FRONTEND_URL=http://localhost
-      - SEED_DB=false
-      - MINIO_ENDPOINT=minio:9000
-      - MINIO_ACCESS_KEY=volleyadmin
-      - MINIO_SECRET_KEY=volleypass123
-      - MINIO_PUBLIC_URL=http://storage.localhost
-      - FACEBOOK_OEMBED_TOKEN=
-    volumes:
-      - ./backend:/app
-      - /app/node_modules
+      NODE_ENV: production
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
+      REDIS_URL: redis://redis:6379
+      FRONTEND_URL: https://coach.florent-huitric.fr
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY}
+      MINIO_USE_SSL: "false"
+      MINIO_BUCKET_NAME: volleycoaching
+      JWT_SECRET: ${JWT_SECRET}
+      MINIO_PUBLIC_URL: https://storage-coach.florent-huitric.fr
+      SEED_DB: ${SEED_DB:-false}
+      POSTGRES_USER: ${POSTGRES_USER}
     depends_on:
       postgres:
         condition: service_healthy
@@ -70,105 +62,101 @@ services:
       minio:
         condition: service_started
     networks:
-      - volleycoaching-network
-    restart: unless-stopped
+      - volleycoaching_net
+      - proxy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.volleycoaching-api.rule=Host(`api-coach.florent-huitric.fr`)"
+      - "traefik.http.routers.volleycoaching-api.entrypoints=websecure"
+      - "traefik.http.routers.volleycoaching-api.tls.certresolver=letsencrypt"
+      - "traefik.http.services.volleycoaching-api.loadbalancer.server.port=3001"
+      # Headers pour WebSocket
+      - "traefik.http.middlewares.volleycoaching-headers.headers.customrequestheaders.X-Forwarded-Proto=https"
+      - "traefik.http.routers.volleycoaching-api.middlewares=volleycoaching-headers"
 
-  # Base de données PostgreSQL
+  # PostgreSQL
   postgres:
     image: postgres:15-alpine
-    ports:
-      - "5432:5432"
+    container_name: volleycoaching-postgres
+    restart: always
+    env_file:
+      - .env
     environment:
-      - POSTGRES_DB=volleycoaching
-      - POSTGRES_USER=volleyuser
-      - POSTGRES_PASSWORD=volleypass
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./database/init:/docker-entrypoint-initdb.d
     networks:
-      - volleycoaching-network
+      - volleycoaching_net
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U volleyuser -d volleycoaching"]
       interval: 10s
       timeout: 5s
       retries: 5
-    restart: unless-stopped
 
-  # Adminer - Database Management UI
-  adminer:
-    image: adminer:latest
-    expose:
-      - "8080"
-    environment:
-      - ADMINER_DEFAULT_SERVER=postgres
-      - ADMINER_DESIGN=nette
-    depends_on:
-      - postgres
-    networks:
-      - volleycoaching-network
-    restart: unless-stopped
-
-  # Redis pour le cache et les sessions temps réel
+  # Redis
   redis:
     image: redis:7-alpine
-    ports:
-      - "6379:6379"
+    container_name: volleycoaching-redis
+    restart: always
     volumes:
       - redis_data:/data
     networks:
-      - volleycoaching-network
+      - volleycoaching_net
 
-  # Service de stockage des médias (MinIO - alternative S3)
+  # MinIO - S3-compatible storage
   minio:
     image: minio/minio:latest
-    ports:
-      - "9000:9000"
-      - "9001:9001"
+    container_name: volleycoaching-minio
+    restart: always
+    env_file:
+      - .env
     environment:
-      - MINIO_ROOT_USER=volleyadmin
-      - MINIO_ROOT_PASSWORD=volleypass123
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY}
     volumes:
       - minio_data:/data
     command: server /data --console-address ":9001"
     networks:
-      - volleycoaching-network
+      - volleycoaching_net
+      - proxy
+    labels:
+      - "traefik.enable=true"
+      # MinIO API (for public file access)
+      - "traefik.http.routers.volleycoaching-storage.rule=Host(`storage-coach.florent-huitric.fr`)"
+      - "traefik.http.routers.volleycoaching-storage.entrypoints=websecure"
+      - "traefik.http.routers.volleycoaching-storage.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.volleycoaching-storage.service=volleycoaching-storage"
+      - "traefik.http.services.volleycoaching-storage.loadbalancer.server.port=9000"
 
-  # Service d'analyse vidéo (Python/FastAPI pour l'IA) - DISABLED FOR NOW
-  # video-service:
-  #   build:
-  #     context: ./services/video-analysis
-  #     dockerfile: Dockerfile
-  #   ports:
-  #     - "8000:8000"
-  #   environment:
-  #     - DATABASE_URL=postgresql://volleyuser:volleypass@postgres:5432/volleycoaching
-  #     - REDIS_URL=redis://redis:6379
-  #     - MINIO_ENDPOINT=minio:9000
-  #     - MINIO_ACCESS_KEY=volleyadmin
-  #     - MINIO_SECRET_KEY=volleypass123
-  #   volumes:
-  #     - ./services/video-analysis:/app
-  #   depends_on:
-  #     - postgres
-  #     - redis
-  #     - minio
-  #   networks:
-  #     - volleycoaching-network
+  # Adminer - Database Management UI
+  adminer:
+    image: adminer:latest
+    container_name: volleycoaching-adminer
+    restart: always
+    environment:
+      ADMINER_DEFAULT_SERVER: postgres
+      ADMINER_DESIGN: nette
+    depends_on:
+      - postgres
+    networks:
+      - volleycoaching_net
+      - proxy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.volleycoaching-adminer.rule=Host(`adminer-coach.florent-huitric.fr`)"
+      - "traefik.http.routers.volleycoaching-adminer.entrypoints=websecure"
+      - "traefik.http.routers.volleycoaching-adminer.tls.certresolver=letsencrypt"
+      - "traefik.http.services.volleycoaching-adminer.loadbalancer.server.port=8080"
 
-# ============================================
-# VOLUMES - Persistent Data Storage
-# ============================================
-# Ces volumes sont nommés et gérés par Docker.
-# Ils persistent même après 'docker-compose down' ou 'docker system prune'.
-# Pour les supprimer, il faut explicitement utiliser 'docker volume rm' ou 'docker system prune --volumes'.
-#
-# Localisation des données:
-# - Linux/WSL2: /var/lib/docker/volumes/volleycoaching_postgres_data/_data
-# - Windows Docker Desktop: \\wsl$\docker-desktop-data\version-pack-data\community\docker\volumes\
-#
-# Sauvegarde recommandée:
-# docker exec volleycoaching-postgres-1 pg_dump -U volleyuser volleycoaching > backup.sql
-# ============================================
+networks:
+  volleycoaching_net:
+    driver: bridge
+  proxy:
+    external: true
+
 volumes:
   postgres_data:
     name: volleycoaching_postgres_data
@@ -176,7 +164,3 @@ volumes:
     name: volleycoaching_redis_data
   minio_data:
     name: volleycoaching_minio_data
-
-networks:
-  volleycoaching-network:
-    driver: bridge

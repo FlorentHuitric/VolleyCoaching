@@ -22,7 +22,7 @@ interface Team {
 }
 
 interface TeamSelectorProps {
-  currentTeamId: string;
+  currentTeamId: string | null;
   onTeamChange: (teamId: string) => void;
   onCreateTeam?: () => void;
 }
@@ -59,8 +59,8 @@ export function TeamSelector({
 
   return (
     <div className="flex items-center gap-2">
-      <Select value={currentTeamId} onValueChange={onTeamChange}>
-        <SelectTrigger className="w-48">
+      <Select value={currentTeamId || ""} onValueChange={onTeamChange}>
+        <SelectTrigger className="w-full sm:w-48">
           <SelectValue placeholder="Sélectionner une équipe" />
         </SelectTrigger>
         <SelectContent>

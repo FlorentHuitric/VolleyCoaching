@@ -65,10 +65,10 @@ export default function TrainingSessionDisplay({
   return (
     <div className="space-y-6">
       {/* Header */}
-      <Card className="bg-gradient-to-r from-blue-600 to-purple-600 text-white border-0">
+      <Card className="bg-card text-foreground border-border">
         <CardHeader>
-          <div className="flex items-start justify-between">
-            <div className="flex-1">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="flex-1 min-w-[180px]">
               <div className="flex items-center space-x-2 mb-2">
                 {session.completed ? (
                   <CheckCircle2 className="h-6 w-6 text-green-300" />
@@ -134,7 +134,7 @@ export default function TrainingSessionDisplay({
           <CardContent className="p-4">
             <div className="text-sm text-gray-600 dark:text-gray-400 mb-1">Difficulté</div>
             <Badge className={getDifficultyColor(session.difficulty)}>
-              {session.difficulty}
+              {({beginner:"Débutant",intermediate:"Intermédiaire",advanced:"Avancé",expert:"Expert"})[session.difficulty]}
             </Badge>
           </CardContent>
         </Card>
@@ -215,7 +215,7 @@ export default function TrainingSessionDisplay({
                     </div>
                   </div>
                   <Badge variant="outline" className={getPhaseColor(phase.phase)}>
-                    {phase.phase}
+                    {phase.name}
                   </Badge>
                 </div>
               </CardHeader>
@@ -223,12 +223,12 @@ export default function TrainingSessionDisplay({
               <CardContent>
                 {phase.exercises.length === 0 ? (
                   <p className="text-sm text-gray-500 dark:text-gray-400 italic">
-                    Aucun exercice dans cette phase
+                    Créneau à préparer par le coach : aucun exercice adapté dans la bibliothèque.
                   </p>
                 ) : (
                   <div className="space-y-3">
                     {phase.exercises.map((phaseEx, exIdx) => {
-                      const exercise = getExerciseById(phaseEx.exerciseId);
+                      const exercise = session.exerciseSnapshots?.[phaseEx.exerciseId] || getExerciseById(phaseEx.exerciseId);
                       if (!exercise) return null;
 
                       return (

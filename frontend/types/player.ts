@@ -1,10 +1,10 @@
 /**
  * UNIFIED TYPE DEFINITIONS
  * Source of Truth: PostgreSQL database via GraphQL API (backend/schema.gql)
- * 
+ *
  * This file centralizes all type definitions to ensure 100% coherence across the app.
  * DO NOT create duplicate types elsewhere - import from here instead.
- * 
+ *
  * Principles:
  * - Single Source of Truth (DRY)
  * - Types mirror GraphQL schema exactly
@@ -31,13 +31,7 @@ export enum PlayerStatus {
   SUSPENDED = 'SUSPENDED'
 }
 
-export enum ContractLevel {
-  ELITE = 'ELITE',
-  SENIOR = 'SENIOR',
-  RESERVE = 'RESERVE',
-  YOUTH = 'YOUTH',
-  ACADEMY = 'ACADEMY'
-}
+export enum ContractLevel { TRIAL='TRIAL', DEVELOPMENT='DEVELOPMENT', ROTATION='ROTATION', STARTER='STARTER' }
 
 // ============================================
 // TECHNICAL SKILLS (from GraphQL)
@@ -187,7 +181,7 @@ export interface EvaluationType {
   id: string;
   playerId: string;
   evaluatorId: string;
-  date: Date;
+  evaluationDate: Date;
   overallRating: number;
   potentialRating: number;
   technical: TechnicalSkills;
@@ -206,53 +200,56 @@ export interface EvaluationType {
 // ============================================
 
 export interface PlayerType {
+  rosterTeamIds?: string[];
+  assessmentKind?: string;
+
   // Identity
   id: string;
   firstName: string;
   lastName: string;
   preferredName: string | null;
-  dateOfBirth: Date;
+  dateOfBirth: Date | null;
   nationality: string;
   avatar: string | null;
-  
+
   // Team & Status
   orgId: string;
   teamId: string;
   primaryPosition: Position;
   secondaryPosition: Position | null;
-  jerseyNumber: number;
+  jerseyNumber: number | null;
   status: PlayerStatus;
   contractLevel: ContractLevel;
-  
+
   // Contact
   email: string | null;
   phone: string | null;
-  
+
   // Physical Measurements (direct properties)
   height: number | null;
   weight: number | null;
   wingspan: number | null;
   armReach: number | null;
   dominantHand: string;
-  
+
   // Experience
   yearsOfExperience: number;
   joinDate: Date;
-  
+
   // Current Stats (JSON fields in database)
   currentRating: number | null;
   potentialRating: number | null;
   currentTechnical: TechnicalSkills | null;
   currentPhysical: PhysicalAttributes | null;
   currentMental: MentalAttributes | null;
-  
+
   // Evaluation Summary
   currentEvaluation: EvaluationType | null;
   evaluations: EvaluationType[];
   lastEvaluationDate: Date | null;
   strengths: string[];
   weaknesses: string[];
-  
+
   // Metadata
   statsUpdatedAt: Date | null;
   createdAt: Date;
@@ -310,7 +307,7 @@ export function hasMentalAttributes(player: PlayerType): player is PlayerType & 
  * @deprecated Use number (0-10) directly instead
  * Keep only for backward compatibility during migration
  */
-export type SkillRating = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10;
+export type SkillRating = number;
 
 // ============================================
 // UTILITY FUNCTIONS

@@ -1,4 +1,5 @@
 'use client';
+import type { VolleyballPosition } from '@/hooks/useCourtStore';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -13,7 +14,7 @@ interface SimplePlayer {
   firstName: string;
   lastName: string;
   avatar?: string;
-  primaryPosition?: string;
+  primaryPosition?: VolleyballPosition;
   currentRating?: number;
 }
 

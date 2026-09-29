@@ -139,7 +139,7 @@ export function CreateTeamDialog({
                   <SelectItem value="YOUTH">Jeunes</SelectItem>
                   <SelectItem value="JUNIOR">Junior</SelectItem>
                   <SelectItem value="SENIOR">Senior</SelectItem>
-                  <SelectItem value="ELITE">Élite</SelectItem>
+                  <SelectItem value="PROFESSIONAL">Élite</SelectItem>
                 </SelectContent>
               </Select>
             </div>

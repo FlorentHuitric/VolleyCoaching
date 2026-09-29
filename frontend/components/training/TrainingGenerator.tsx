@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { PlayerProfile } from '@/types/player-evaluation';
+import { PlayerType as PlayerProfile } from '@/types/player';
 import { TrainingSession, TrainingGeneratorParams, ExerciseDifficulty } from '@/types/exercises';
 import { generateTrainingSession } from '@/services/trainingService';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -107,13 +107,13 @@ export default function TrainingGenerator({
   ];
 
   return (
-    <Card className="bg-gradient-to-br from-purple-50 to-blue-50 dark:from-purple-900/20 dark:to-blue-900/20 border-purple-200 dark:border-purple-800">
+    <Card className="bg-card border-border">
       <CardHeader>
-        <CardTitle className="flex items-center space-x-2 text-purple-900 dark:text-purple-100">
+        <CardTitle className="flex items-center space-x-2 text-foreground">
           <Wand2 className="h-6 w-6" />
-          <span>Générateur Automatique d'Entraînement</span>
+          <span>Préparer une séance</span>
         </CardTitle>
-        <p className="text-sm text-purple-700 dark:text-purple-300 mt-2">
+        <p className="text-sm text-muted-foreground mt-2">
           Créez un entraînement personnalisé en fonction de vos joueurs et de leurs besoins
         </p>
       </CardHeader>
@@ -159,7 +159,7 @@ export default function TrainingGenerator({
             ) : (
               // Client-side render: full interactive badges
               availablePlayers.map(player => {
-                const rating = player.currentEvaluation?.overallRating || 5;
+                const rating = player.currentRating ?? 0;
                 const isSelected = selectedPlayerIds.includes(player.id);
 
                 // Get actual color values for inline styles

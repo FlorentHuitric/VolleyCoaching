@@ -1,4 +1,7 @@
 @import "tailwindcss";
+@config "../tailwind.config.ts";
+@custom-variant dark (&:where(.dark, .dark *));
+@import "./astren.css";
 
 :root {
   --background: 0 0% 100%;
@@ -155,19 +158,19 @@
   }
 
   /* Switch avec contraste fort */
-  [data-state="unchecked"] {
+  button[role="switch"][data-state="unchecked"] {
     background-color: hsl(210 40% 85%) !important; /* Gris clair */
   }
 
-  [data-state="checked"] {
+  button[role="switch"][data-state="checked"] {
     background-color: hsl(210 40% 60%) !important; /* Gris foncé */
   }
 
-  .dark [data-state="unchecked"] {
+  .dark button[role="switch"][data-state="unchecked"] {
     background-color: hsl(215 28% 17%) !important; /* Gris très foncé */
   }
 
-  .dark [data-state="checked"] {
+  .dark button[role="switch"][data-state="checked"] {
     background-color: hsl(210 40% 70%) !important; /* Gris clair en mode sombre */
   }
 

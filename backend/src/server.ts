@@ -1,5 +1,5 @@
 import 'reflect-metadata';
-import express from 'express';
+import express, { RequestHandler } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import multer from 'multer';
@@ -54,9 +54,23 @@ async function startServer() {
     });
   });
 
+  const requireUser: RequestHandler = async (req, res, next) => {
+    try {
+      const token = extractTokenFromHeader(req);
+      const user = token ? await container.resolve(AuthService).getUserFromToken(token) : null;
+      if (!user) { res.status(401).json({ error: 'Connexion requise.' }); return; }
+      if (!['ADMIN', 'COACH', 'ASSISTANT_COACH'].includes(user.role)) { res.status(403).json({ error: 'Accès interdit.' }); return; }
+      res.locals.user = user;
+      next();
+    } catch { res.status(503).json({ error: 'Service temporairement indisponible.' }); }
+  };
+
   // File upload endpoint
-  const upload = multer({ storage: multer.memoryStorage() });
-  app.post('/upload', upload.single('file'), async (req, res) => {
+  const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 8 * 1024 * 1024, files: 1 }, fileFilter: (_req, file, done) => {
+    if (['image/jpeg','image/png','image/webp'].includes(file.mimetype)) done(null, true);
+    else done(new Error('Formats acceptés : JPEG, PNG ou WebP.'));
+  } });
+  app.post('/upload', requireUser, upload.single('file'), async (req, res) => {
     try {
       if (!req.file) {
         return res.status(400).json({ error: 'No file uploaded' });
@@ -73,9 +87,10 @@ async function startServer() {
   });
 
   // Export endpoints (PDF & Excel)
-  app.get('/export/player/:id/pdf', async (req, res) => {
+  app.get('/export/player/:id/pdf', requireUser, async (req, res) => {
     try {
       const exportService = container.resolve(ExportService);
+      if (!await container.resolve(AuthService).validateUserOwnsPlayer(res.locals.user.id, req.params.id)) return res.status(403).json({ error: 'Accès interdit.' });
       const buffer = await exportService.generatePlayerPDF(req.params.id);
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader('Content-Disposition', `attachment; filename=joueur-${req.params.id}.pdf`);
@@ -87,9 +102,10 @@ async function startServer() {
     }
   });
 
-  app.get('/export/team/:id/excel', async (req, res) => {
+  app.get('/export/team/:id/excel', requireUser, async (req, res) => {
     try {
       const exportService = container.resolve(ExportService);
+      if (!await container.resolve(AuthService).validateUserOwnsTeam(res.locals.user.id, req.params.id)) return res.status(403).json({ error: 'Accès interdit.' });
       const buffer = await exportService.generateTeamExcel(req.params.id);
       res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
       res.setHeader('Content-Disposition', `attachment; filename=equipe-${req.params.id}.xlsx`);
@@ -178,16 +194,28 @@ async function startServer() {
     })
   );
 
+  app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+    res.status(err?.code === 'LIMIT_FILE_SIZE' ? 413 : 400).json({ error: err?.code === 'LIMIT_FILE_SIZE' ? 'Image trop volumineuse (8 Mo maximum).' : 'Requête ou fichier invalide.' });
+  });
+
+  io.use(async (socket, next) => {
+    const user = await container.resolve(AuthService).getUserFromToken(socket.handshake.auth?.token || '');
+    if (!user) return next(new Error('Connexion requise.'));
+    socket.data.user = user;
+    next();
+  });
   // Socket.IO for real-time features
   io.on('connection', (socket) => {
     console.log('Client connected:', socket.id);
 
-    socket.on('join-tactical-room', (tacticId: string) => {
+    socket.on('join-tactical-room', async (tacticId: string) => {
+      if (typeof tacticId !== 'string' || !await container.resolve(AuthService).validateUserOwnsTeam(socket.data.user.id, tacticId)) return;
       socket.join(`tactic-${tacticId}`);
       console.log(`Client ${socket.id} joined tactic room: ${tacticId}`);
     });
 
     socket.on('player-movement', (data) => {
+      if (!data || typeof data.tacticId !== 'string' || !socket.rooms.has(`tactic-${data.tacticId}`)) return;
       socket.to(`tactic-${data.tacticId}`).emit('player-movement-update', data);
     });
 

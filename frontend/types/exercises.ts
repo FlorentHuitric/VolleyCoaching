@@ -1,4 +1,5 @@
-import { SkillRating, VolleyballPosition } from './player-evaluation';
+import { SkillRating } from './player';
+import { VolleyballPosition } from '@/hooks/useCourtStore';
 
 /**
  * Types d'exercices pour évaluation automatisée
@@ -181,6 +182,7 @@ export interface ExerciseRecommendation {
  * Training session plan
  */
 export interface TrainingSession {
+  exerciseSnapshots?: Record<string, TrainingExercise>;
   id: string;
   name: string;
   date: Date;

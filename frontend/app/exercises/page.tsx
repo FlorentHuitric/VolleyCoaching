@@ -1,5 +1,7 @@
 'use client';
 
+import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
+import { AppNavigation } from '@/components/layout/AppNavigation';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { useQuery, useMutation } from '@apollo/client';
@@ -21,7 +23,9 @@ import ExerciseCard from '@/components/exercises/ExerciseCard';
 import ExerciseDetailPanel from '@/components/exercises/ExerciseDetailPanel';
 import VideoLightbox from '@/components/exercises/VideoLightbox';
 
-export default function ExercisesPage() {
+export default function ExercisesPage() { return <ProtectedRoute><AppNavigation/><ExercisesContent/></ProtectedRoute>; }
+
+function ExercisesContent() {
   const { user } = useAuth();
   const { currentTeamId } = useTeam();
 

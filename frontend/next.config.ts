@@ -1,6 +1,19 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Output standalone pour Docker
+  output: 'standalone',
+
+  // Ignorer ESLint au build (erreurs non-bloquantes)
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
+
+  // Vérifier les types avant toute mise en production
+  typescript: {
+    ignoreBuildErrors: false,
+  },
+
   // Configuration optimisée pour le hot reload
   experimental: {
     // Optimisation des imports

@@ -1,4 +1,4 @@
-import { PlayerProfile } from '@/types/player-evaluation';
+import { PlayerProfile } from '@/types/player';
 import { VolleyballPosition } from '@/hooks/useCourtStore';
 
 export interface LineupPosition {
@@ -103,7 +103,7 @@ export class LineupValidator {
     // Check position compatibility (basic validation) - Skip for now to avoid blocking saves
     // const incompatibleAssignments = lineup.filter(pos => {
     //   if (!pos.player) return false;
-    //   const playerPrimaryPosition = pos.player.technicalProfile?.primaryPosition || pos.player.primaryPosition;
+    //   const playerPrimaryPosition = pos.pos.player.primaryPosition;
     //   const playerSecondaryPositions = pos.player.technicalProfile?.secondaryPositions || pos.player.secondaryPositions || [];
 
     //   return playerPrimaryPosition !== pos.position &&

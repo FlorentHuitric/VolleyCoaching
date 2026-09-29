@@ -1,6 +1,6 @@
 'use client';
 
-import { PlayerProfile } from '@/types/player-evaluation';
+import { PlayerProfile } from '@/types/player';
 import { getPositionAbbreviation } from '@/utils/volleyballUtils';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -32,7 +32,7 @@ export default function PlayerTable({
   onExerciseEvaluation
 }: PlayerTableProps) {
   const getStatusIcon = (status: string) => {
-    switch (status) {
+    switch (status.toLowerCase()) {
       case 'active':
         return <div className="w-2 h-2 bg-green-500 rounded-full"></div>;
       case 'injured':
@@ -51,7 +51,7 @@ export default function PlayerTable({
       development: 'bg-yellow-100 text-yellow-800 border-yellow-200',
       trial: 'bg-gray-100 text-gray-800 border-gray-200'
     };
-    return colors[level as keyof typeof colors] || colors.trial;
+    return colors[level.toLowerCase() as keyof typeof colors] || colors.trial;
   };
 
   const getRatingTrend = (current: number, potential: number) => {
@@ -63,9 +63,9 @@ export default function PlayerTable({
 
   return (
     <Card>
-      <CardContent className="p-0">
+      <CardContent className="p-0 overflow-x-auto">
         {/* Header */}
-        <div className="grid grid-cols-12 gap-4 p-4 border-b bg-gray-50 dark:bg-gray-800 font-medium text-sm text-gray-700 dark:text-gray-300">
+        <div className="grid grid-cols-12 gap-4 p-4 min-w-[760px] border-b bg-gray-50 dark:bg-gray-800 font-medium text-sm text-gray-700 dark:text-gray-300">
           <div className="col-span-3">Joueur</div>
           <div className="col-span-1 text-center">Pos</div>
           <div className="col-span-1 text-center">Note</div>
@@ -86,7 +86,7 @@ export default function PlayerTable({
               <div className="col-span-3 flex items-center space-x-3">
                 <Avatar className="w-10 h-10 border-2 border-white shadow-sm">
                   <AvatarImage
-                    src={player.avatar}
+                    src={player.avatar || undefined}
                     alt={`${player.firstName} ${player.lastName}`}
                   />
                   <AvatarFallback className="text-sm font-bold">
@@ -98,7 +98,8 @@ export default function PlayerTable({
                     {player.firstName} {player.lastName}
                   </h4>
                   <p className="text-sm text-gray-500 dark:text-gray-400">
-                    #{player.jerseyNumber}
+                    {player.jerseyNumber == null ? 'N° à renseigner' : `#${player.jerseyNumber}`}
+                    {player.assessmentKind === 'ESTIMATED' && <span className="block text-xs">Notes provisoires</span>}
                   </p>
                 </div>
               </div>
@@ -141,9 +142,9 @@ export default function PlayerTable({
               <div className="col-span-2 flex items-center space-x-2">
                 {getStatusIcon(player.status)}
                 <span className="text-sm capitalize text-gray-600 dark:text-gray-400">
-                  {player.status === 'active' ? 'Actif' :
-                   player.status === 'injured' ? 'Blessé' :
-                   player.status === 'suspended' ? 'Suspendu' : 'Inactif'}
+                  {player.status === 'ACTIVE' ? 'Actif' :
+                   player.status === 'INJURED' ? 'Blessé' :
+                   player.status === 'SUSPENDED' ? 'Suspendu' : 'Inactif'}
                 </span>
               </div>
 
@@ -152,24 +153,24 @@ export default function PlayerTable({
                 <Button
                   size="sm"
                   variant="ghost"
-                  onClick={() => onViewPlayer(player)}
-                  className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                  aria-label="Voir la fiche" onClick={() => onViewPlayer(player)}
+                  className="h-8 w-8 p-0 opacity-100 transition-opacity"
                 >
                   <Eye className="h-4 w-4" />
                 </Button>
                 <Button
                   size="sm"
                   variant="ghost"
-                  onClick={() => onEvaluatePlayer(player)}
-                  className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                  aria-label="Modifier le joueur" onClick={() => onEditPlayer(player)}
+                  className="h-8 w-8 p-0 opacity-100 transition-opacity"
                 >
                   <Edit className="h-4 w-4" />
                 </Button>
                 <Button
                   size="sm"
                   variant="ghost"
-                  onClick={() => onExerciseEvaluation(player)}
-                  className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity text-purple-600"
+                  aria-label="Évaluer le joueur" onClick={() => onEvaluatePlayer(player)}
+                  className="h-8 w-8 p-0 opacity-100 transition-opacity text-purple-600"
                 >
                   <Target className="h-4 w-4" />
                 </Button>

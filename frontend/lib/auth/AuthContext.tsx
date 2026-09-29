@@ -1,5 +1,6 @@
 'use client';
 
+import apolloClient from '@/lib/apolloClient';
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 
@@ -39,7 +40,7 @@ export interface SignupData {
   password: string;
   firstName: string;
   lastName: string;
-  orgId: string;
+  orgName: string;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -79,6 +80,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     localStorage.removeItem(ACCESS_TOKEN_KEY);
     localStorage.removeItem(REFRESH_TOKEN_KEY);
     localStorage.removeItem(USER_KEY);
+    localStorage.removeItem("volleycoaching_current_team_id");
+    void apolloClient.clearStore();
   }, []);
 
   // Save user to localStorage
@@ -236,6 +239,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       const authData = result.data?.login;
       if (authData) {
+        await apolloClient.clearStore();
         saveTokens(authData.tokens);
         saveUser(authData.user);
         // Don't redirect here - let the login page handle it
@@ -291,6 +295,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       const authData = result.data?.signup;
       if (authData) {
+        await apolloClient.clearStore();
         saveTokens(authData.tokens);
         saveUser(authData.user);
         // Don't redirect here - let the signup page handle it
@@ -313,6 +318,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const initAuth = async () => {
       setIsLoading(true);
 
+      /* Only trust the server-verified user.
       // Try to get user from localStorage first
       const storedUser = localStorage.getItem(USER_KEY);
       if (storedUser) {
@@ -323,6 +329,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       }
 
+      */
       // Verify token is still valid
       const token = getAccessToken();
       if (token) {
@@ -333,6 +340,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           // Token is invalid, try to refresh
           await refreshTokens();
         }
+      } else {
+        if (getRefreshToken()) await refreshTokens();
+        else { clearTokens(); setUser(null); }
       }
 
       setIsLoading(false);

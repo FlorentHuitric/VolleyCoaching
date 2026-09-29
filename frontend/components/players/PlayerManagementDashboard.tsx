@@ -26,7 +26,6 @@ import ExerciseRecommendations from '../recommendations/ExerciseRecommendations'
 import { PlayerCardSkeletonGrid } from './PlayerCardSkeleton';
 import { VolleyballLoader } from '@/components/ui/volleyball-loader';
 
-const DEFAULT_TEAM_ID = 'cmgcp7q5k000811vp53bn2ttz'; // Elite Squad
 
 interface PlayerManagementDashboardProps {
   className?: string;
@@ -35,16 +34,11 @@ interface PlayerManagementDashboardProps {
 export default function PlayerManagementDashboard({ className }: PlayerManagementDashboardProps) {
   const { currentTeamId, setCurrentTeamId } = useTeam();
 
-  // Initialize team ID if not set
-  useEffect(() => {
-    if (!currentTeamId) {
-      setCurrentTeamId(DEFAULT_TEAM_ID);
-    }
-  }, [currentTeamId, setCurrentTeamId]);
+
 
   // Fetch players directly from GraphQL
   const { data, loading, error } = useQuery(GET_PLAYERS_BY_TEAM, {
-    variables: { teamId: currentTeamId || DEFAULT_TEAM_ID },
+    variables: { teamId: currentTeamId },
     fetchPolicy: 'cache-and-network', // Show cached data immediately while fetching fresh data
     skip: !currentTeamId // Don't run query until we have a team ID
   });
@@ -74,9 +68,9 @@ export default function PlayerManagementDashboard({ className }: PlayerManagemen
         // Override with safe defaults for essential fields
         firstName: p.firstName || '',
         lastName: p.lastName || '',
-        dateOfBirth: p.dateOfBirth ? new Date(p.dateOfBirth) : new Date(),
+        dateOfBirth: p.dateOfBirth ? new Date(p.dateOfBirth) : null,
         nationality: p.nationality || '',
-        contractLevel: p.contractLevel || ContractLevel.RESERVE,
+        contractLevel: p.contractLevel || ContractLevel.ROTATION,
         currentEvaluation: currentEval,
         evaluationHistory: p.evaluations || []
       } as PlayerProfile;
@@ -111,7 +105,8 @@ export default function PlayerManagementDashboard({ className }: PlayerManagemen
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
 
   // Helper functions
-  const calculateAge = (dateOfBirth: Date) => {
+  const calculateAge = (dateOfBirth: Date | null) => {
+    if (!dateOfBirth) return null;
     const today = new Date();
     const age = today.getFullYear() - dateOfBirth.getFullYear();
     const monthDifference = today.getMonth() - dateOfBirth.getMonth();
@@ -161,7 +156,7 @@ export default function PlayerManagementDashboard({ className }: PlayerManagemen
         }
 
         // Age range
-        if (age < filterAgeMin || age > filterAgeMax) return false;
+        if (age !== null && (age < filterAgeMin || age > filterAgeMax)) return false;
 
         // Height range - only apply if player has height
         if (height !== undefined && height !== null && height > 0) {
@@ -245,8 +240,8 @@ export default function PlayerManagementDashboard({ className }: PlayerManagemen
           bValue = b.currentEvaluation?.physical?.measurements?.height || 0;
           break;
         case 'age':
-          aValue = calculateAge(a.dateOfBirth);
-          bValue = calculateAge(b.dateOfBirth);
+          aValue = calculateAge(a.dateOfBirth) ?? -1;
+          bValue = calculateAge(b.dateOfBirth) ?? -1;
           break;
         case 'position':
           aValue = a.primaryPosition;
@@ -321,8 +316,9 @@ export default function PlayerManagementDashboard({ className }: PlayerManagemen
 
   const getTeamStats = () => {
     const totalPlayers = players.length;
-    const averageRating = players.reduce((sum, p) => sum + (p.currentEvaluation?.overallRating || 0), 0) / totalPlayers;
-    const starters = players.filter(p => p.contractLevel === ContractLevel.ELITE || p.contractLevel === ContractLevel.SENIOR).length;
+    const ratedPlayers = players.filter(p=>p.currentRating !== null);
+    const averageRating = ratedPlayers.reduce((sum, p) => sum + (p.currentRating || 0), 0) / (ratedPlayers.length || 1);
+    const starters = players.filter(p => p.contractLevel === 'STARTER').length;
     const positions = players.reduce((acc, p) => {
       acc[p.primaryPosition] = (acc[p.primaryPosition] || 0) + 1;
       return acc;
@@ -350,17 +346,18 @@ export default function PlayerManagementDashboard({ className }: PlayerManagemen
 
   return (
     <div className={`w-full space-y-6 ${className}`}>
+      {players.some(p=>p.assessmentKind==='ESTIMATED') && <p className="rounded-xl border border-primary/30 bg-primary/5 p-4 text-sm">Notes provisoires : ces premières estimations sont à confirmer. Les joueurs du pool B/C partagent la même fiche dans les deux effectifs.</p>}
       {/* Dashboard Header */}
-      <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white p-6 rounded-2xl shadow-lg">
-        <div className="flex items-center justify-between">
+      <div className="bg-card text-foreground p-5 sm:p-6 rounded-2xl border shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold flex items-center space-x-3">
+            <h1 className="text-2xl sm:text-3xl font-bold flex items-center gap-3">
               <Users className="h-8 w-8" />
               <span>Gestion des Joueurs</span>
             </h1>
-            <p className="text-blue-100 mt-2">Système complet d'évaluation et de développement des joueurs de volleyball</p>
+            <p className="text-muted-foreground mt-2">Système complet d'évaluation et de développement des joueurs de volleyball</p>
           </div>
-                    <div className="flex space-x-2">
+                    <div className="flex flex-wrap gap-2">
             <Link href="/players/new">
               <Button className="bg-green-600 hover:bg-green-700 text-white">
                 <Plus className="h-4 w-4 mr-2" />
@@ -373,13 +370,7 @@ export default function PlayerManagementDashboard({ className }: PlayerManagemen
                 Nouvelle Évaluation
               </Button>
             </Link>
-            <Button
-              onClick={() => setShowExerciseEvaluation(true)}
-              className="bg-white text-purple-600 hover:bg-purple-50 border-purple-200"
-            >
-              <Target className="h-4 w-4 mr-2" />
-              Évaluation par Exercices
-            </Button>
+
           </div>
         </div>
 
@@ -428,8 +419,8 @@ export default function PlayerManagementDashboard({ className }: PlayerManagemen
             <CardContent className="p-4">
               <div className="flex flex-col gap-4">
                 <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-                  <div className="flex items-center space-x-4 flex-1">
-                    <div className="relative flex-1 max-w-sm">
+                  <div className="flex flex-wrap items-center gap-3 flex-1 min-w-0 w-full">
+                    <div className="relative flex-1 min-w-[160px] max-w-sm">
                       <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
                       <input
                         type="text"
@@ -831,16 +822,16 @@ export default function PlayerManagementDashboard({ className }: PlayerManagemen
                 onViewPlayer={(player) => {
                   setSelectedPlayerId(player.id);
                   // Navigation directe vers la page du joueur
-                  window.location.href = `/player/${player.id}`;
+                  window.location.href = `/players/${player.id}`;
                 }}
-                onEditPlayer={() => {}} // Pour plus tard
+                onEditPlayer={(player) => { window.location.href = `/players/${player.id}/edit`; }}
                 onEvaluatePlayer={(player) => {
                   // Redirect to evaluation page instead of old form
                   window.location.href = `/evaluation?playerId=${player.id}`;
                 }}
                 onExerciseEvaluation={(player) => {
                   setSelectedPlayerId(player.id);
-                  setShowExerciseEvaluation(true);
+                  window.location.href = `/evaluation?playerId=${player.id}`;
                 }}
               />
             </div>

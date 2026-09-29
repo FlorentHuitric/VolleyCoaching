@@ -160,7 +160,7 @@ export default function SprintTestForm({
 
       {/* Results Preview */}
       {rating && (
-        <Card className="bg-gradient-to-r from-orange-50 to-red-50 dark:from-orange-900/20 dark:to-red-900/20">
+        <Card className="bg-secondary">
           <CardContent className="p-6">
             <div className="flex items-center space-x-2 mb-4">
               <Award className="h-6 w-6 text-orange-600" />
