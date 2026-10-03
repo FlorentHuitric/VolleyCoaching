@@ -211,6 +211,7 @@ export interface TrainingPhase {
 export interface TrainingPhaseExercise {
   exerciseId: string;
   duration: number;
+  groups?: number;
   notes?: string;
   sets?: number;
   reps?: number;
@@ -240,6 +241,8 @@ export interface TrainingGeneratorParams {
   totalDuration: number; // in minutes (default 90)
   difficulty: ExerciseDifficulty;
   focusAreas?: string[]; // specific skills to focus on
+  focusMode?: 'weaknesses' | 'strengths' | 'manual';
+  availableEquipment?: string[];
   includeWarmup: boolean;
   includeStretching: boolean;
   includeGame: boolean;

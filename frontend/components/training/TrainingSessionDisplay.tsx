@@ -92,7 +92,7 @@ export default function TrainingSessionDisplay({
                 </span>
               </div>
             </div>
-            <div className="flex space-x-2">
+            <div className="flex w-full flex-wrap gap-2 sm:w-auto">
               {!session.completed && onMarkComplete && (
                 <Button
                   onClick={onMarkComplete}
@@ -193,7 +193,7 @@ export default function TrainingSessionDisplay({
           <span>Déroulement de la séance</span>
         </h3>
 
-        {session.phases
+        {[...session.phases]
           .sort((a, b) => a.order - b.order)
           .map((phase, phaseIdx) => (
             <Card
@@ -244,6 +244,9 @@ export default function TrainingSessionDisplay({
                               <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
                                 {exercise.description}
                               </p>
+                              {exercise.execution&&<p className="mt-2 text-sm text-foreground">{exercise.execution}</p>}
+                              {exercise.equipment.length>0&&<p className="mt-2 text-xs text-muted-foreground">Matériel : {exercise.equipment.join(', ')}</p>}
+                              {exercise.media?.map(media=><a key={media.url} href={media.url} target="_blank" rel="noopener noreferrer" className="mt-2 inline-flex min-h-10 items-center text-sm font-medium text-primary underline">Voir la vidéo de l’exercice ↗</a>)}
                               <div className="flex items-center space-x-3 mt-2 text-xs text-gray-500 dark:text-gray-500">
                                 <span className="flex items-center">
                                   <Clock className="h-3 w-3 mr-1" />
@@ -251,7 +254,7 @@ export default function TrainingSessionDisplay({
                                 </span>
                                 <span className="flex items-center">
                                   <Users className="h-3 w-3 mr-1" />
-                                  {exercise.minPlayers}-{exercise.maxPlayers} joueurs
+                                  {phaseEx.groups&&phaseEx.groups>1?`${phaseEx.groups} ateliers d’environ ${Math.ceil(session.playersIds.length/phaseEx.groups)} joueurs`:`${session.playersIds.length} joueurs`}
                                 </span>
                               </div>
                               {phaseEx.notes && (

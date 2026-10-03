@@ -118,7 +118,7 @@ async function startServer() {
   });
 
   // Instagram oEmbed proxy endpoint
-  app.get('/api/instagram/oembed', async (req, res) => {
+  app.get('/api/instagram/oembed', requireUser, async (req, res) => {
     try {
       const instagramUrl = req.query.url as string;
 
@@ -126,8 +126,10 @@ async function startServer() {
         return res.status(400).json({ error: 'Missing required "url" query parameter' });
       }
 
-      // Validate that it looks like an Instagram URL
-      if (!instagramUrl.includes('instagram.com/')) {
+      let parsed: URL;
+      try { parsed = new URL(instagramUrl); }
+      catch { return res.status(400).json({ error: 'Invalid Instagram URL' }); }
+      if (parsed.protocol !== 'https:' || !['instagram.com','www.instagram.com'].includes(parsed.hostname.toLowerCase()) || !/^\/(p|reel|tv)\/[\w-]+/.test(parsed.pathname)) {
         return res.status(400).json({ error: 'Invalid Instagram URL' });
       }
 
@@ -143,11 +145,10 @@ async function startServer() {
         oembedApiUrl = `https://api.instagram.com/oembed?url=${encodedUrl}&omitscript=true`;
       }
 
-      const response = await fetch(oembedApiUrl);
+      const response = await fetch(oembedApiUrl, { signal: AbortSignal.timeout(8000) });
 
       if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Instagram oEmbed API error:', response.status, errorText);
+        console.error('Instagram oEmbed API error:', response.status);
         return res.status(response.status).json({
           error: 'Failed to fetch Instagram oEmbed data',
           details: response.status === 404 ? 'Post not found or not accessible' : 'Instagram API error',

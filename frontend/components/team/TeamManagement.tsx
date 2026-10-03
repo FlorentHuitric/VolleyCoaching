@@ -84,14 +84,14 @@ export default function TeamManagement() {
   const { currentTeamId } = useTeam();
   const [activeTab, setActiveTab] = useState("overview");
   const [isEditing, setIsEditing] = useState(false);
-
+  
   // Fetch players via Apollo Client
   const { data } = useQuery(GET_PLAYERS_BY_TEAM, {
     variables: { teamId: currentTeamId },
     skip: !currentTeamId
   });
   const players: PlayerType[] = data?.playersByTeam || [];
-
+  
   const [lineup, setLineup] = useState<LineupPosition[]>([]);
 
   const [teamInfo, setTeamInfo] = useState<TeamInfo>({

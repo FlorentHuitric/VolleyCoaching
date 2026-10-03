@@ -19,8 +19,10 @@ export default function DrawingCanvas({ courtBounds, meterToPixel, pixelToMeter 
   const [isDrawingPath, setIsDrawingPath] = useState(false);
   const [currentPath, setCurrentPath] = useState<{ x: number; y: number }[]>([]);
 
-  const handleMouseDown = (e: React.MouseEvent<SVGSVGElement>) => {
+  const handleMouseDown = (e: React.PointerEvent<SVGSVGElement>) => {
     if (!isDrawing) return;
+    e.preventDefault();
+    e.currentTarget.setPointerCapture(e.pointerId);
 
     const svg = e.currentTarget;
     const rect = svg.getBoundingClientRect();
@@ -35,7 +37,7 @@ export default function DrawingCanvas({ courtBounds, meterToPixel, pixelToMeter 
     setCurrentPath([{ x: meterX, y: meterY }]);
   };
 
-  const handleMouseMove = (e: React.MouseEvent<SVGSVGElement>) => {
+  const handleMouseMove = (e: React.PointerEvent<SVGSVGElement>) => {
     if (!isDrawing || !isDrawingPath) return;
 
     const svg = e.currentTarget;
@@ -99,11 +101,12 @@ export default function DrawingCanvas({ courtBounds, meterToPixel, pixelToMeter 
         pointerEvents: isDrawing ? 'auto' : 'none',
         zIndex: isDrawing ? 50 : 10,
         cursor: isDrawing ? 'crosshair' : 'default',
+        touchAction: isDrawing ? 'none' : 'auto',
       }}
-      onMouseDown={handleMouseDown}
-      onMouseMove={handleMouseMove}
-      onMouseUp={handleMouseUp}
-      onMouseLeave={handleMouseLeave}
+      onPointerDown={handleMouseDown}
+      onPointerMove={handleMouseMove}
+      onPointerUp={handleMouseUp}
+      onPointerCancel={handleMouseLeave}
     >
       {/* Dessins sauvegardés */}
       {currentPhase.drawings.map((drawing, index) => {

@@ -1,7 +1,7 @@
 'use client';
 
 import { useRef, useState, useEffect } from 'react';
-import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, useDroppable, PointerSensor, MouseSensor, TouchSensor, useSensor, useSensors } from '@dnd-kit/core';
+import { DndContext, DragEndEvent, DragStartEvent, useDroppable, PointerSensor, TouchSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { useCourtStore, Player } from '@/hooks/useCourtStore';
 import { useLineup } from '@/hooks/useLineup';
 import { useBenchPlayers } from '@/hooks/useBenchPlayers';
@@ -16,6 +16,8 @@ import { getPositionColor, getPositionAbbreviation } from '@/utils/volleyballUti
 
 export default function InteractiveCourt() {
   const courtRef = useRef<HTMLDivElement>(null);
+  const fitRef = useRef<HTMLDivElement>(null);
+  const [courtScale, setCourtScale] = useState(1);
   const [activePlayer, setActivePlayer] = useState<Player | null>(null);
   const [lineupApplied, setLineupApplied] = useState(false);
   const [substitutionModalOpen, setSubstitutionModalOpen] = useState(false);
@@ -51,22 +53,26 @@ export default function InteractiveCourt() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentLineup, lineupLoading]);
 
-  // Configuration des sensors - ajoutons tous les types
+  useEffect(() => {
+    if (!fitRef.current) return;
+    const observer = new ResizeObserver(([entry]) => {
+      setCourtScale(Math.max(0.72, Math.min(1, entry.contentRect.width / 900)));
+    });
+    observer.observe(fitRef.current);
+    return () => observer.disconnect();
+  }, []);
+
+  // A short hold distinguishes a touch drag from ordinary page scrolling.
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
-        distance: 1,
-      },
-    }),
-    useSensor(MouseSensor, {
-      activationConstraint: {
-        distance: 1,
+        distance: 7,
       },
     }),
     useSensor(TouchSensor, {
       activationConstraint: {
-        delay: 250,
-        tolerance: 5,
+        delay: 180,
+        tolerance: 8,
       },
     })
   );
@@ -95,30 +101,26 @@ export default function InteractiveCourt() {
   });
 
   const handleDragStart = (event: DragStartEvent) => {
-    console.log('DRAG START called!', event.active.id);
-    const player = event.active.data.current as Player;
-    setActivePlayer(player);
+    const data = event.active.data.current as Player | {type:'ball'} | undefined;
+    setActivePlayer(data && 'id' in data ? data as Player : null);
   };
 
   const handleDragEnd = (event: DragEndEvent) => {
-    console.log('DRAG END called!', event);
     setActivePlayer(null);
 
     const draggedData = event.active.data.current as any;
     if (!draggedData) {
-      console.log('No dragged data');
       return;
     }
 
     // Convertir le delta de pixels en mètres (sans la marge car c'est un déplacement relatif)
-    const deltaMetersX = ((event.delta.x || 0) / COURT_WIDTH) * 18;  // X: 18m de large
-    const deltaMetersY = ((event.delta.y || 0) / COURT_HEIGHT) * 9; // Y: 9m de haut
+    const deltaMetersX = ((event.delta.x || 0) / courtScale / COURT_WIDTH) * 18;
+    const deltaMetersY = ((event.delta.y || 0) / courtScale / COURT_HEIGHT) * 9;
 
     // Vérifier si c'est un ballon ou un joueur
     if (draggedData.type === 'ball') {
       // Gestion du ballon
       if (!currentPhase.ball) {
-        console.log('No ball in current phase');
         return;
       }
 
@@ -128,13 +130,6 @@ export default function InteractiveCourt() {
       // Contraintes pour le ballon (peut aller sur tout le terrain + zones de service)
       const constrainedX = Math.max(-3, Math.min(21, newMeterX));
       const constrainedY = Math.max(-2, Math.min(11, newMeterY));
-
-      console.log('Ball position update:', {
-        originalPosition: currentPhase.ball.position,
-        deltaPixels: event.delta,
-        deltaMeters: { x: deltaMetersX, y: deltaMetersY },
-        newPosition: { x: constrainedX, y: constrainedY }
-      });
 
       updateBallPosition({
         x: constrainedX,
@@ -148,7 +143,6 @@ export default function InteractiveCourt() {
       // Il faut récupérer la position originale en mètres depuis le store
       const originalPlayer = currentPhase.players.find(p => p.id === player.id);
       if (!originalPlayer) {
-        console.log('Original player not found');
         return;
       }
 
@@ -159,14 +153,6 @@ export default function InteractiveCourt() {
       // Contraintes élargies pour les prises d'élan (terrain horizontal)
       const constrainedX = Math.max(-3, Math.min(21, newMeterX)); // 18m + 3m de chaque côté
       const constrainedY = Math.max(-2, Math.min(11, newMeterY)); // 9m + 2m de chaque côté
-
-      console.log('Correct position update:', {
-        player: player.name,
-        originalPosition: originalPlayer.position,
-        deltaPixels: event.delta,
-        deltaMeters: { x: deltaMetersX, y: deltaMetersY },
-        newPosition: { x: constrainedX, y: constrainedY }
-      });
 
       // Mettre à jour avec la position contrainte en mètres
       updatePlayerPosition(player.id, {
@@ -210,17 +196,19 @@ export default function InteractiveCourt() {
       <DndContext
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
-        onDragMove={(event) => console.log('DRAG MOVE', event.delta)}
-        onDragCancel={() => console.log('DRAG CANCEL')}
+        onDragCancel={() => setActivePlayer(null)}
         sensors={sensors}
       >
+        <p className="text-xs text-muted-foreground sm:hidden">Balayez le terrain pour voir l’autre côté. Maintenez un joueur ou le ballon pour le déplacer.</p>
+        <div ref={fitRef} className="w-full overflow-x-auto overflow-y-hidden pb-8" style={{height:500*courtScale+32}}>
         <div
           ref={setNodeRef}
-          className={`volleyball-court relative mx-auto ${isOver ? 'bg-blue-50 dark:bg-blue-900/20' : ''} rounded-lg shadow-xl transition-all duration-200 max-w-full`}
+          className={`volleyball-court relative ${isOver ? 'bg-blue-50 dark:bg-blue-900/20' : ''} rounded-lg shadow-xl transition-colors duration-200`}
           style={{
-            width: Math.min(COURT_WIDTH + (MARGIN * 2), window?.innerWidth ? window.innerWidth - 32 : 900),
+            width: COURT_WIDTH + MARGIN * 2,
             height: COURT_HEIGHT + (MARGIN * 2),
-            aspectRatio: `${COURT_WIDTH + (MARGIN * 2)} / ${COURT_HEIGHT + (MARGIN * 2)}`,
+            transform:`scale(${courtScale})`,
+            transformOrigin:'top left',
           }}
         >
         <div ref={courtRef} className="relative w-full h-full overflow-hidden rounded-lg">
@@ -488,6 +476,7 @@ export default function InteractiveCourt() {
         <div className="absolute -bottom-6 left-0 right-0 text-center text-xs text-gray-600 font-medium">
           🏐 Terrain officiel 18m × 9m • Lignes d'attaque à 3m du filet • Glissez-déposez les joueurs
         </div>
+      </div>
       </div>
 
       </DndContext>

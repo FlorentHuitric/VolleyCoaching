@@ -46,7 +46,8 @@ model Organization {
   name      String
   type      OrgType  @default(CLUB)
   country   String?
-  logo      String?
+    logo      String?
+    assessmentProtocols Json?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

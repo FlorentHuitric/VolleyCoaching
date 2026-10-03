@@ -144,7 +144,7 @@ export default function TeamManagementRefactored() {
                   firstName: p.firstName,
                   lastName: p.lastName,
                   avatar: p.avatar,
-                  jerseyNumber: p.jerseyNumber || 0,
+                  jerseyNumber: p.jerseyNumber ?? null,
                   primaryPosition: p.primaryPosition as any || 'OUTSIDE_HITTER',
                   secondaryPositions: [],
                   status: 'active' as const,
@@ -160,7 +160,7 @@ export default function TeamManagementRefactored() {
                       input: {
                         teamId: currentTeamId,
                         name: 'Default Lineup',
-                        positions: lineup,
+                        positions: lineup.map(position=>({courtPosition:position.courtPosition,position:position.position,player:position.player?{id:position.player.id}:null})),
                       },
                     },
                   });

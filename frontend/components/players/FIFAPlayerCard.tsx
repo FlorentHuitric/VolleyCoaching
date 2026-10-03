@@ -91,7 +91,7 @@ export default function FIFAPlayerCard({ player, isSelected = false, onSelect }:
       'tom-green': '/images/players/tom-green-portrait.png',
       'alex-gray': '/images/players/alex-gray-portrait.png',
     };
-
+    
     return portraitMap[fullName] || null;
   };
 
@@ -299,8 +299,8 @@ export default function FIFAPlayerCard({ player, isSelected = false, onSelect }:
         <>
           {/* Effet prismatique de base - statique */}
           <div className="absolute inset-0 opacity-20">
-            <div
-              className="absolute inset-0"
+            <div 
+              className="absolute inset-0" 
               style={{
                 background: 'linear-gradient(to right, rgba(236, 72, 153, 0.3) 0%, rgba(147, 51, 234, 0.3) 20%, rgba(59, 130, 246, 0.3) 40%, rgba(16, 185, 129, 0.3) 60%, rgba(245, 158, 11, 0.3) 80%, rgba(239, 68, 68, 0.3) 100%)'
               }}
@@ -308,8 +308,8 @@ export default function FIFAPlayerCard({ player, isSelected = false, onSelect }:
           </div>
           {/* Effet holographique rotatif - statique */}
           <div className="absolute inset-0 opacity-40">
-            <div
-              className="absolute inset-0"
+            <div 
+              className="absolute inset-0" 
               style={{
                 background: 'conic-gradient(from 0deg, transparent 0%, rgba(255, 255, 255, 0.15) 25%, transparent 50%, rgba(255, 255, 255, 0.15) 75%, transparent 100%)'
               }}
@@ -320,8 +320,8 @@ export default function FIFAPlayerCard({ player, isSelected = false, onSelect }:
             <>
               {/* Rotation rainbow au hover */}
               <div className="absolute inset-0 opacity-40">
-                <div
-                  className="absolute inset-0 animate-spin"
+                <div 
+                  className="absolute inset-0 animate-spin" 
                   style={{
                     background: 'linear-gradient(to right, rgba(236, 72, 153, 0.5) 0%, rgba(147, 51, 234, 0.5) 20%, rgba(59, 130, 246, 0.5) 40%, rgba(16, 185, 129, 0.5) 60%, rgba(245, 158, 11, 0.5) 80%, rgba(239, 68, 68, 0.5) 100%)',
                     animationDuration: '4s'
@@ -330,8 +330,8 @@ export default function FIFAPlayerCard({ player, isSelected = false, onSelect }:
               </div>
               {/* Rotation holographique au hover */}
               <div className="absolute inset-0 opacity-60">
-                <div
-                  className="absolute inset-0 animate-spin"
+                <div 
+                  className="absolute inset-0 animate-spin" 
                   style={{
                     background: 'conic-gradient(from 0deg, transparent 0%, rgba(255, 255, 255, 0.25) 25%, transparent 50%, rgba(255, 255, 255, 0.25) 75%, transparent 100%)',
                     animationDuration: '8s'
@@ -627,17 +627,17 @@ export default function FIFAPlayerCard({ player, isSelected = false, onSelect }:
                 <div className={`text-6xl font-black leading-none mb-1 ${textColors.rating} fifa-text-shadow`} suppressHydrationWarning>
                   {overallRating}
                 </div>
-
+                
                 {/* Position */}
                 <div className={`${textColors.position} text-lg uppercase tracking-wider font-semibold fifa-text-shadow`}>
                   {getPositionAbbreviation(player.primaryPosition as any)}
                 </div>
-
+                
                 {/* Badge rareté compact */}
                 <Badge className={`${getRarityBadgeStyle(overallRating)} text-xs font-bold px-2 py-0.5 border mt-2`}>
                   {getRarityName(overallRating)}
                 </Badge>
-
+                
                 {/* Nation/Club - Dynamic flag + Position */}
                 <div className="mt-3 space-y-2">
                   <div className={`w-8 h-6 bg-gradient-to-r ${getCountryFlagGradient(player.nationality)} rounded border border-white/30 shadow-sm`}></div>
@@ -723,7 +723,7 @@ export default function FIFAPlayerCard({ player, isSelected = false, onSelect }:
                       TEC
                     </div>
                   </div>
-
+                  
                   {/* PHY */}
                   <div className="flex items-center space-x-3">
                     <div className={`font-black text-lg ${getStatColor(physRating)} min-w-[24px] text-right fifa-text-shadow`}>
@@ -733,7 +733,7 @@ export default function FIFAPlayerCard({ player, isSelected = false, onSelect }:
                       PHY
                     </div>
                   </div>
-
+                  
                   {/* MEN */}
                   <div className="flex items-center space-x-3">
                     <div className={`font-black text-lg ${getStatColor(mentalRating)} min-w-[24px] text-right fifa-text-shadow`}>
@@ -755,7 +755,7 @@ export default function FIFAPlayerCard({ player, isSelected = false, onSelect }:
                       POT
                     </div>
                   </div>
-
+                  
                   {player.assessmentKind === "ESTIMATED" && <span className="rounded-md bg-black/70 px-2 py-1 text-xs text-white">Notes provisoires</span>}
                 </div>
               </div>
@@ -763,7 +763,7 @@ export default function FIFAPlayerCard({ player, isSelected = false, onSelect }:
 
             {/* Effet de brillance supérieur */}
             <div className="absolute top-0 left-0 right-0 h-40 bg-gradient-to-b from-white/25 via-white/10 to-transparent pointer-events-none"></div>
-
+            
             {/* Effet de dégradé inférieur */}
             <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-black/30 via-black/10 to-transparent pointer-events-none"></div>
 
@@ -771,7 +771,7 @@ export default function FIFAPlayerCard({ player, isSelected = false, onSelect }:
             <div className={`absolute inset-0 rounded-2xl border-2 transition-all duration-300 pointer-events-none ${
               isHovered ? 'border-white/50' : 'border-white/15'
             }`}></div>
-
+            
             {/* Effet de brillance sur les bords au hover */}
             {isHovered && (
               <div className="absolute inset-0 rounded-2xl pointer-events-none">

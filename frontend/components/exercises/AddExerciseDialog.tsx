@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { useMutation } from '@apollo/client';
+import { useAuth } from '@/lib/auth/AuthContext';
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter,
   DialogHeader, DialogTitle
@@ -31,6 +32,7 @@ interface AddExerciseDialogProps {
 export default function AddExerciseDialog({
   open, onClose, onSuccess, tags, orgId, userId
 }: AddExerciseDialogProps) {
+  const {getAccessToken}=useAuth();
   const [activeTab, setActiveTab] = useState<'manual' | 'instagram'>('instagram');
   const [instagramUrl, setInstagramUrl] = useState('');
   const [fetchingMeta, setFetchingMeta] = useState(false);
@@ -63,7 +65,7 @@ export default function AddExerciseDialog({
   const [createTag] = useMutation(CREATE_EXERCISE_TAG);
 
   const validateInstagramUrl = (url: string) => {
-    return /^https?:\/\/(www\.)?instagram\.com\/(p|reel|tv)\/[\w-]+/.test(url);
+    return /^https:\/\/(www\.)?instagram\.com\/(p|reel|tv)\/[\w-]+/.test(url);
   };
 
   const fetchInstagramMeta = async () => {
@@ -75,7 +77,8 @@ export default function AddExerciseDialog({
     setFetchingMeta(true);
     try {
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/api/instagram/oembed?url=${encodeURIComponent(instagramUrl)}`
+        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/api/instagram/oembed?url=${encodeURIComponent(instagramUrl)}`,
+        {headers:{Authorization:`Bearer ${getAccessToken()}`}}
       );
 
       if (response.ok) {
@@ -112,6 +115,7 @@ export default function AddExerciseDialog({
   const handleSubmit = async () => {
     // Ensure Instagram URL from input field is captured even without fetch
     const finalInstagramUrl = form.instagramUrl || (activeTab === 'instagram' && instagramUrl ? instagramUrl : '');
+    if (finalInstagramUrl && !validateInstagramUrl(finalInstagramUrl)) { toast.warning('Utilisez un lien Instagram HTTPS valide.'); return; }
 
     if (!form.name.trim()) {
       toast.warning('Le nom est obligatoire');
@@ -196,14 +200,14 @@ export default function AddExerciseDialog({
         <DialogHeader>
           <DialogTitle>Ajouter un exercice</DialogTitle>
           <DialogDescription>
-            Importez depuis Instagram ou creez manuellement
+            Ajoutez un exercice et, si vous en avez un, le lien vers sa vidéo.
           </DialogDescription>
         </DialogHeader>
 
         <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)}>
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="instagram" className="gap-2">
-              <Instagram className="h-4 w-4" /> Import Instagram
+              <Instagram className="h-4 w-4" /> Lien Instagram
             </TabsTrigger>
             <TabsTrigger value="manual" className="gap-2">
               <Plus className="h-4 w-4" /> Creation manuelle
@@ -214,7 +218,7 @@ export default function AddExerciseDialog({
           <TabsContent value="instagram" className="space-y-4">
             <div className="space-y-2">
               <Label>URL du post/reel Instagram</Label>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 <Input
                   placeholder="https://www.instagram.com/reel/..."
                   value={instagramUrl}
@@ -232,7 +236,7 @@ export default function AddExerciseDialog({
                 </Button>
               </div>
               <p className="text-xs text-muted-foreground">
-                Collez l'URL d'un reel ou post Instagram contenant une video d'exercice
+                Depuis votre collection enregistrée, copiez le lien du post ou du reel. Les collections privées ne se synchronisent pas automatiquement.
               </p>
             </div>
 
@@ -240,10 +244,7 @@ export default function AddExerciseDialog({
               <div className="p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg flex items-center gap-2">
                 <Check className="h-4 w-4 text-green-600" />
                 <span className="text-sm text-green-700 dark:text-green-300">
-                  {form.instagramUrl
-                    ? 'Video Instagram liee (metadonnees recuperees)'
-                    : 'URL Instagram sera enregistree avec l\'exercice'
-                  }
+                  Lien Instagram prêt à être enregistré avec l’exercice
                 </span>
               </div>
             )}
@@ -294,7 +295,7 @@ export default function AddExerciseDialog({
           </div>
 
           {/* Category, Difficulty, Intensity */}
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="space-y-2">
               <Label>Categorie</Label>
               <Select value={form.category} onValueChange={(v) => setForm(prev => ({ ...prev, category: v }))}>
@@ -335,7 +336,7 @@ export default function AddExerciseDialog({
           </div>
 
           {/* Duration, Players */}
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="space-y-2">
               <Label>Duree (min)</Label>
               <Input

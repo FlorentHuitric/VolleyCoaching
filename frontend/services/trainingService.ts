@@ -15,6 +15,7 @@ import {
 } from '@/types/exercises';
 import { TRAINING_EXERCISES } from '@/data/exercises';
 import { identifyWeaknesses } from './recommendationService';
+import { normalizeEquipment, normalizeSkill, stationCount, teamSkillPriorities, skillLabels } from './trainingFocus';
 
 // ============================================
 // SINGLE RESPONSIBILITY: Exercise Filtering
@@ -137,7 +138,10 @@ export const selectExercisesForPhase = (
   availableDuration: number,
   playerCount: number,
   difficulty: ExerciseDifficulty,
-  targetWeaknesses: string[]
+  targetWeaknesses: string[],
+  catalog: TrainingExercise[],
+  availableEquipment: string[] = [],
+  usedExerciseIds: Set<string> = new Set()
 ): TrainingExercise[] => {
   const phaseCategories: Record<string, string[]> = {
     warmup: ['physical'],
@@ -148,7 +152,8 @@ export const selectExercisesForPhase = (
   };
 
   // Filter exercises by phase requirements
-  let candidates = TRAINING_EXERCISES.filter(exercise => {
+  let candidates = catalog.filter(exercise => {
+    if (usedExerciseIds.has(exercise.id)) return false;
     // Warm-up and stretching must be explicitly tagged; a sprint is not a substitute.
     if (phaseType==='warmup' && !exercise.tags.includes('échauffement')) return false;
     if (phaseType==='stretching' && !exercise.tags.includes('étirements')) return false;
@@ -156,7 +161,10 @@ export const selectExercisesForPhase = (
     if (!phaseCategories[phaseType]?.includes(exercise.category)) return false;
 
     // Must fit player count
-    if (exercise.minPlayers > playerCount || exercise.maxPlayers < playerCount) return false;
+    if (stationCount(playerCount,exercise.minPlayers,exercise.maxPlayers)===null) return false;
+
+    const equipment=new Set(availableEquipment.map(normalizeEquipment));
+    if (exercise.equipment.some(item=>!equipment.has(normalizeEquipment(item)))) return false;
 
     // Difficulty should be appropriate (allow one level up or down)
     const difficultyOrder: ExerciseDifficulty[] = ['beginner', 'intermediate', 'advanced', 'expert'];
@@ -172,16 +180,15 @@ export const selectExercisesForPhase = (
     let score = 0;
 
     // Bonus for matching weaknesses
-    if (exercise.targetWeaknesses) {
-      const matchCount = exercise.targetWeaknesses.filter(w =>
-        targetWeaknesses.includes(w)
-      ).length;
-      score += matchCount * 10;
-    }
+    const priority=new Map(targetWeaknesses.map((skill,index)=>[skill,targetWeaknesses.length-index]));
+    const matching=[...Object.keys(exercise.improvesSkills),...(exercise.targetWeaknesses||[]),...exercise.tags].map(normalizeSkill);
+    const focusScore=Math.max(0,...matching.map(skill=>priority.get(skill)||0));
+    score+=focusScore*10;
+    if(focusScore&&exercise.media?.some(media=>media.type==='instagram'||media.type==='youtube'))score+=5;
 
     // Bonus for high improvement values
     const improvementValues = Object.values(exercise.improvesSkills).filter(v => v) as number[];
-    score += improvementValues.reduce((sum, val) => sum + val, 0);
+    score += Math.min(5,improvementValues.reduce((sum, val) => sum + val, 0)/10);
 
     return { exercise, score };
   });
@@ -194,7 +201,8 @@ export const selectExercisesForPhase = (
   let timeUsed = 0;
 
   for (const { exercise } of scoredExercises) {
-    if (timeUsed + exercise.duration <= availableDuration) {
+    // A 10-minute warm-up should still fit a nominal 9-minute phase.
+    if (timeUsed + exercise.duration <= availableDuration + Math.min(5,Math.max(1,Math.ceil(availableDuration*0.2)))) {
       selected.push(exercise);
       timeUsed += exercise.duration;
     }
@@ -239,10 +247,19 @@ export const aggregatePlayerWeaknesses = (players: PlayerProfile[]): string[] =>
  */
 export const generateTrainingSession = (
   players: PlayerProfile[],
-  params: TrainingGeneratorParams
+  params: TrainingGeneratorParams,
+  catalog: TrainingExercise[]
 ): TrainingSession => {
   const playerCount = players.length;
-  const teamWeaknesses = aggregatePlayerWeaknesses(players);
+  const prioritySkills = params.focusMode==='manual'
+    ? [...new Set((params.focusAreas||[]).map(normalizeSkill))]
+    : teamSkillPriorities(players,params.focusMode==='strengths'?'strengths':'weaknesses');
+  const selectedExerciseIds=new Set<string>();
+  const choose=(phase:string,minutes:number,level:ExerciseDifficulty,targets:string[])=>{
+    const selected=selectExercisesForPhase(phase,minutes,playerCount,level,targets,catalog,params.availableEquipment||[],selectedExerciseIds);
+    selected.forEach(exercise=>selectedExerciseIds.add(exercise.id));
+    return selected;
+  };
 
   // Calculate phase durations
   const phaseDurations = calculatePhaseDurations(params.totalDuration, params);
@@ -253,13 +270,7 @@ export const generateTrainingSession = (
 
   // Warmup phase
   if (params.includeWarmup && phaseDurations.warmup > 0) {
-    const exercises = selectExercisesForPhase(
-      'warmup',
-      phaseDurations.warmup,
-      playerCount,
-      'beginner', // Warmup is always beginner level
-      []
-    );
+    const exercises = choose('warmup',phaseDurations.warmup,'beginner',[]);
 
     phases.push({
       id: `phase-warmup-${Date.now()}`,
@@ -269,20 +280,15 @@ export const generateTrainingSession = (
       order: phaseOrder++,
       exercises: exercises.map(ex => ({
         exerciseId: ex.id,
-        duration: ex.duration
+        duration: ex.duration,
+        groups: stationCount(playerCount,ex.minPlayers,ex.maxPlayers)||1
       }))
     });
   }
 
   // Stretching phase
   if (params.includeStretching && phaseDurations.stretching > 0) {
-    const exercises = selectExercisesForPhase(
-      'stretching',
-      phaseDurations.stretching,
-      playerCount,
-      'beginner',
-      []
-    );
+    const exercises = choose('stretching',phaseDurations.stretching,'beginner',[]);
 
     phases.push({
       id: `phase-stretching-${Date.now()}`,
@@ -292,20 +298,15 @@ export const generateTrainingSession = (
       order: phaseOrder++,
       exercises: exercises.map(ex => ({
         exerciseId: ex.id,
-        duration: ex.duration
+        duration: ex.duration,
+        groups: stationCount(playerCount,ex.minPlayers,ex.maxPlayers)||1
       }))
     });
   }
 
   // Technical phase
   if (phaseDurations.technical > 0) {
-    const exercises = selectExercisesForPhase(
-      'technical',
-      phaseDurations.technical,
-      playerCount,
-      params.difficulty,
-      teamWeaknesses
-    );
+    const exercises = choose('technical',phaseDurations.technical,params.difficulty,prioritySkills);
 
     phases.push({
       id: `phase-technical-${Date.now()}`,
@@ -315,20 +316,15 @@ export const generateTrainingSession = (
       order: phaseOrder++,
       exercises: exercises.map(ex => ({
         exerciseId: ex.id,
-        duration: ex.duration
+        duration: ex.duration,
+        groups: stationCount(playerCount,ex.minPlayers,ex.maxPlayers)||1
       }))
     });
   }
 
   // Intense phase
   if (phaseDurations.intense > 0) {
-    const exercises = selectExercisesForPhase(
-      'intense',
-      phaseDurations.intense,
-      playerCount,
-      params.difficulty,
-      teamWeaknesses
-    );
+    const exercises = choose('intense',phaseDurations.intense,params.difficulty,prioritySkills);
 
     phases.push({
       id: `phase-intense-${Date.now()}`,
@@ -338,20 +334,15 @@ export const generateTrainingSession = (
       order: phaseOrder++,
       exercises: exercises.map(ex => ({
         exerciseId: ex.id,
-        duration: ex.duration
+        duration: ex.duration,
+        groups: stationCount(playerCount,ex.minPlayers,ex.maxPlayers)||1
       }))
     });
   }
 
   // Game phase
   if (params.includeGame && phaseDurations.game > 0) {
-    const exercises = selectExercisesForPhase(
-      'game',
-      phaseDurations.game,
-      playerCount,
-      params.difficulty,
-      []
-    );
+    const exercises = choose('game',phaseDurations.game,params.difficulty,prioritySkills);
 
     phases.push({
       id: `phase-game-${Date.now()}`,
@@ -361,26 +352,27 @@ export const generateTrainingSession = (
       order: phaseOrder++,
       exercises: exercises.map(ex => ({
         exerciseId: ex.id,
-        duration: ex.duration
+        duration: ex.duration,
+        groups: stationCount(playerCount,ex.minPlayers,ex.maxPlayers)||1
       }))
     });
   }
 
   // Generate objectives based on weaknesses
-  const objectives = teamWeaknesses.slice(0, 3).map(weakness => {
-    const formattedWeakness = weakness.replace(/_/g, ' ');
-    return `Améliorer: ${formattedWeakness}`;
-  });
+  const objectives = prioritySkills.slice(0,3).map(skill=>`${params.focusMode==='strengths'?'Renforcer':'Travailler'} : ${skillLabels[skill]||skill}`);
 
+  const activePhases=phases.filter(phase=>phase.exercises.length>0).map(phase=>({...phase,duration:phase.exercises.reduce((sum,exercise)=>sum+exercise.duration,0)}));
+  const actualDuration=activePhases.reduce((sum,phase)=>sum+phase.duration,0);
   return {
+    exerciseSnapshots:Object.fromEntries(phases.flatMap(phase=>phase.exercises).map(row=>[row.exerciseId,catalog.find(ex=>ex.id===row.exerciseId)]).filter(([,exercise])=>exercise)) as Record<string,TrainingExercise>,
     id: `training-${Date.now()}`,
     name: `Entraînement ${new Date().toLocaleDateString('fr-FR')}`,
     date: new Date(),
-    duration: params.totalDuration,
+    duration: actualDuration,
     playersIds: params.playerIds,
-    phases,
+    phases:activePhases,
     objectives: objectives.length > 0 ? objectives : ['Développement général'],
-    notes: `Entraînement généré automatiquement pour ${playerCount} joueur(s)`,
+    notes: `Séance préparée pour ${playerCount} joueurs. Durée demandée : ${params.totalDuration} min ; exercices trouvés : ${actualDuration} min. Répartissez les joueurs en ateliers lorsque plusieurs groupes sont indiqués.`,
     completed: false,
     createdAt: new Date(),
     difficulty: params.difficulty

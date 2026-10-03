@@ -62,7 +62,7 @@ export default function NewEvaluationWizard({
   const [updatePlayer] = useMutation(UPDATE_PLAYER);
   const { createEvaluationSession, sessionId, loading: creatingSession } = useCreateEvaluationSession();
   const { completeEvaluationSession, loading: completingSession } = useCompleteEvaluationSession();
-
+  
   const [currentTestIndex, setCurrentTestIndex] = useState(0);
   const [session, setSession] = useState<EvaluationSession | null>(null);
   const [completedTests, setCompletedTests] = useState<Set<number>>(new Set());
@@ -76,7 +76,7 @@ export default function NewEvaluationWizard({
           user!.id,
           battery.name
         );
-
+        
         // Create local session state for tracking tests
         setSession({
           id: newSessionId,
@@ -109,7 +109,7 @@ export default function NewEvaluationWizard({
 
   const handleTestComplete = (testData: EvaluationTest) => {
     if (!session) return;
-
+    
     // Update session with new test
     const updatedSession = {
       ...session,
@@ -344,36 +344,36 @@ function renderTestForm(
       return <DefenseTestForm initialData={existingTest as any} onComplete={onComplete} />;
     case 'game_situation':
       return <GameSituationTestForm initialData={existingTest as any} onComplete={onComplete} />;
-
+    
     // Phase 2 - Mental tests
     case 'mental_toughness':
-      return <MentalToughnessTestForm
-        initialData={existingTest as any}
-        onComplete={onComplete}
-        onCancel={onCancel}
+      return <MentalToughnessTestForm 
+        initialData={existingTest as any} 
+        onComplete={onComplete} 
+        onCancel={onCancel} 
       />;
-
+    
     case 'game_intelligence':
-      return <GameIntelligenceTestForm
-        initialData={existingTest as any}
-        onComplete={onComplete}
-        onCancel={onCancel}
+      return <GameIntelligenceTestForm 
+        initialData={existingTest as any} 
+        onComplete={onComplete} 
+        onCancel={onCancel} 
       />;
-
+    
     case 'leadership':
-      return <LeadershipEvaluationForm
-        initialData={existingTest as any}
-        onComplete={onComplete}
-        onCancel={onCancel}
+      return <LeadershipEvaluationForm 
+        initialData={existingTest as any} 
+        onComplete={onComplete} 
+        onCancel={onCancel} 
       />;
-
+    
     case 'communication':
-      return <CommunicationTestForm
-        initialData={existingTest as any}
-        onComplete={onComplete}
-        onCancel={onCancel}
+      return <CommunicationTestForm 
+        initialData={existingTest as any} 
+        onComplete={onComplete} 
+        onCancel={onCancel} 
       />;
-
+    
     default:
       return (
         <div className="p-8 text-center text-gray-500">

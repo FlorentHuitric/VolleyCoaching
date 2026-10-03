@@ -1,10 +1,10 @@
 /**
  * UNIFIED TYPE DEFINITIONS
  * Source of Truth: PostgreSQL database via GraphQL API (backend/schema.gql)
- *
+ * 
  * This file centralizes all type definitions to ensure 100% coherence across the app.
  * DO NOT create duplicate types elsewhere - import from here instead.
- *
+ * 
  * Principles:
  * - Single Source of Truth (DRY)
  * - Types mirror GraphQL schema exactly
@@ -211,7 +211,7 @@ export interface PlayerType {
   dateOfBirth: Date | null;
   nationality: string;
   avatar: string | null;
-
+  
   // Team & Status
   orgId: string;
   teamId: string;
@@ -220,36 +220,36 @@ export interface PlayerType {
   jerseyNumber: number | null;
   status: PlayerStatus;
   contractLevel: ContractLevel;
-
+  
   // Contact
   email: string | null;
   phone: string | null;
-
+  
   // Physical Measurements (direct properties)
   height: number | null;
   weight: number | null;
   wingspan: number | null;
   armReach: number | null;
   dominantHand: string;
-
+  
   // Experience
   yearsOfExperience: number;
   joinDate: Date;
-
+  
   // Current Stats (JSON fields in database)
   currentRating: number | null;
   potentialRating: number | null;
   currentTechnical: TechnicalSkills | null;
   currentPhysical: PhysicalAttributes | null;
   currentMental: MentalAttributes | null;
-
+  
   // Evaluation Summary
   currentEvaluation: EvaluationType | null;
   evaluations: EvaluationType[];
   lastEvaluationDate: Date | null;
   strengths: string[];
   weaknesses: string[];
-
+  
   // Metadata
   statsUpdatedAt: Date | null;
   createdAt: Date;

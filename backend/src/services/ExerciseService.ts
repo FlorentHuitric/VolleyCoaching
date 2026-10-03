@@ -1,6 +1,16 @@
 import { injectable, inject } from 'tsyringe';
 import { PrismaClient, Exercise, ExerciseTag, ExerciseCategory, ExerciseDifficulty, ExerciseIntensity } from '@prisma/client';
 
+function validateMediaLinks(data: {videoUrl?:string|null;instagramUrl?:string|null;thumbnailUrl?:string|null}) {
+  for (const key of ['videoUrl','instagramUrl','thumbnailUrl'] as const) {
+    const value=data[key];if (!value) continue;
+    if (value.length>2048) throw new Error('Lien vidéo trop long.');
+    let parsed:URL;try{parsed=new URL(value)}catch{throw new Error('Lien vidéo invalide.')}
+    if(parsed.protocol!=='https:' || parsed.username || parsed.password)throw new Error('Utilisez une adresse vidéo HTTPS valide.');
+    if(key==='instagramUrl' && !['instagram.com','www.instagram.com'].includes(parsed.hostname.toLowerCase()))throw new Error('Le lien Instagram doit provenir d’instagram.com.');
+  }
+}
+
 /**
  * Exercise Service
  * Handles exercise library management with user customization
@@ -43,6 +53,7 @@ export class ExerciseService {
     tagIds?: string[];
   }): Promise<Exercise> {
     const { tagIds, ...exerciseData } = data;
+    validateMediaLinks(exerciseData);
 
     const exercise = await this.prisma.exercise.create({
       data: {
@@ -233,6 +244,7 @@ export class ExerciseService {
     id: string,
     data: Partial<Omit<Exercise, 'id' | 'createdAt' | 'updatedAt' | 'isBaseExercise'>>
   ): Promise<Exercise> {
+    validateMediaLinks(data);
     const exercise = await this.prisma.exercise.findUnique({ where: { id } });
 
     if (!exercise) {

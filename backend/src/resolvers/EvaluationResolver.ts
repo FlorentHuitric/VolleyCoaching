@@ -5,11 +5,51 @@ import { Resolver, Query, Mutation, Arg, ID } from 'type-graphql';
 import { injectable, inject } from 'tsyringe';
 import { EvaluationService } from '../services/EvaluationService';
 import { EvaluationType, CompleteEvaluationInput } from '../types/Evaluation.types';
+import { Ctx } from 'type-graphql';
+import type { GraphQLContext } from '../utils/auth.context';
+import { defaultProtocols, scoreProtocol, validateProtocols } from '../utils/assessment-protocols';
 
 @injectable()
 @Resolver(() => EvaluationType)
 export class EvaluationResolver {
   constructor(@inject(PrismaClient) private db: PrismaClient, @inject(EvaluationService) private evaluationService: EvaluationService) {}
+
+  @Query(() => GraphQLJSON)
+  async assessmentProtocols(@Ctx() ctx: GraphQLContext) {
+    const organization = await this.db.organization.findUniqueOrThrow({where:{id:ctx.user!.orgId}});
+    return organization.assessmentProtocols ?? defaultProtocols;
+  }
+
+  @Mutation(() => GraphQLJSON)
+  async saveAssessmentProtocols(@Arg('protocols', () => GraphQLJSON) input: unknown, @Ctx() ctx: GraphQLContext) {
+    if (ctx.user?.role !== 'ADMIN') throw new Error('Seul un administrateur du club peut modifier les barèmes.');
+    const protocols = validateProtocols(input);
+    await this.db.organization.update({where:{id:ctx.user.orgId},data:{assessmentProtocols:protocols}});
+    return protocols;
+  }
+
+  @Mutation(() => GraphQLJSON)
+  async recordProtocolAssessment(
+    @Arg('playerId', () => ID) playerId: string,
+    @Arg('protocolId', () => String) protocolId: string,
+    @Arg('attempts', () => [Number]) attempts: number[],
+    @Ctx() ctx: GraphQLContext
+  ) {
+    const player = await this.db.player.findUniqueOrThrow({where:{id:playerId}});
+    if (player.orgId !== ctx.user!.orgId) throw new Error('Joueur inaccessible.');
+    const org = await this.db.organization.findUniqueOrThrow({where:{id:ctx.user!.orgId}});
+    const protocol = validateProtocols(org.assessmentProtocols ?? defaultProtocols).find(p=>p.id===protocolId);
+    if (!protocol) throw new Error('Protocole inconnu.');
+    const result = scoreProtocol(protocol,attempts);
+    const recordedAt=new Date();
+    const session=await this.db.$transaction(async tx=>{
+      const row=await tx.evaluationSession.create({data:{playerId,evaluatorId:ctx.user!.id,batteryName:protocol.name,status:'COMPLETED',completedAt:recordedAt}});
+      await tx.evaluationTest.create({data:{sessionId:row.id,testId:protocol.id,category:protocol.category as TestCategory,results:{protocol,attempts,...result,recordedAt:recordedAt.toISOString()}}});
+      await tx.player.update({where:{id:playerId},data:{lastEvaluationDate:recordedAt}});
+      return row;
+    });
+    return {id:session.id,protocol,attempts,...result,recordedAt:recordedAt.toISOString()};
+  }
 
   @Query(() => GraphQLJSON)
   async recordedTests(@Arg('teamId', () => ID) teamId: string) {

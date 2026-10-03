@@ -2,10 +2,11 @@
 
 import { useAuth } from '@/lib/auth/AuthContext';
 import { AppNavigation } from '@/components/layout/AppNavigation';
-import { getExerciseById } from '@/services/trainingService';
 import { useState, useEffect } from 'react';
 import { useQuery, gql } from '@apollo/client';
 import { GET_PLAYERS_BY_TEAM } from '@/graphql/queries/players';
+import { GET_EXERCISES } from '@/graphql/queries/exercises';
+import { toTrainingExercise } from '@/services/exerciseCatalog';
 import { useTeam } from '@/contexts/TeamContext';
 import { TrainingSession } from '@/types/exercises';
 import { Card, CardContent } from '@/components/ui/card';
@@ -14,7 +15,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
 import TrainingGenerator from '@/components/training/TrainingGenerator';
 import TrainingSessionDisplay from '@/components/training/TrainingSessionDisplay';
-import ExerciseLibrary from '@/components/training/ExerciseLibrary';
 import { Wand2, Library, Calendar, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { toast } from 'sonner';
@@ -22,21 +22,23 @@ import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 
 export default function TrainingPage() {
   const { currentTeamId } = useTeam();
-  const { getAccessToken } = useAuth();
+  const { getAccessToken, user } = useAuth();
   const [saving,setSaving] = useState(false);
   const { data: savedData, refetch: reloadSessions } = useQuery(gql`query Plans($teamId: ID!) { savedTrainingPlans(teamId: $teamId) }`, {variables:{teamId:currentTeamId},skip:!currentTeamId});
+  const {data:exerciseData,loading:exercisesLoading}=useQuery(GET_EXERCISES,{variables:{orgId:user?.orgId},skip:!user?.orgId});
+  const catalog=(exerciseData?.exercises||[]).map(toTrainingExercise);
   async function mutate(query: string, variables: object) {
    const response=await fetch(process.env.NEXT_PUBLIC_GRAPHQL_URL || 'http://localhost:3001/graphql',{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${getAccessToken()}`},body:JSON.stringify({query,variables})});
    const result=await response.json();if(result.errors)throw new Error(result.errors[0].message);return result.data;
   }
-
+  
   // Fetch players via Apollo Client
   const { data } = useQuery(GET_PLAYERS_BY_TEAM, {
     variables: { teamId: currentTeamId },
     skip: !currentTeamId
   });
   const players = data?.playersByTeam || [];
-
+  
   const [generatedSession, setGeneratedSession] = useState<TrainingSession | null>(null);
   const savedSessions: TrainingSession[] = savedData?.savedTrainingPlans || [];
   const [viewingSession, setViewingSession] = useState<TrainingSession | null>(null);
@@ -51,7 +53,7 @@ export default function TrainingPage() {
     if (!generatedSession || !currentTeamId || saving) return;
     setSaving(true);
     try {
-      const exerciseSnapshots=Object.fromEntries(generatedSession.phases.flatMap(p=>p.exercises).map(e=>[e.exerciseId,getExerciseById(e.exerciseId)]).filter(([,e])=>e));
+      const exerciseSnapshots=generatedSession.exerciseSnapshots||{};
       const data=await mutate('mutation SavePlan($teamId: ID!, $plan: JSON!) { saveTrainingPlan(teamId: $teamId, plan: $plan) }',{teamId:currentTeamId,plan:{...generatedSession,exerciseSnapshots}});
       setGeneratedSession(data.saveTrainingPlan);setViewingSession(data.saveTrainingPlan);await reloadSessions();toast.success('Séance enregistrée sur le serveur.');
     } catch(e){toast.error(e instanceof Error?e.message:'Enregistrement impossible.')}finally{setSaving(false)}
@@ -105,6 +107,7 @@ export default function TrainingPage() {
                 <TrainingGenerator
                   key={currentTeamId || "empty"}
                   availablePlayers={players}
+                  catalog={catalog}
                   onGenerated={handleSessionGenerated}
                 />
               </div>
@@ -149,7 +152,7 @@ export default function TrainingPage() {
 
           {/* Exercise Library Tab */}
           <TabsContent value="library">
-            <ExerciseLibrary availablePlayerCount={players.length} />
+            <div className="rounded-xl border bg-card p-6"><h2 className="text-xl font-semibold">Bibliothèque du club</h2><p className="mt-2 text-sm text-muted-foreground">{exercisesLoading?'Chargement…':`${catalog.length} exercices disponibles pour composer les séances.`} Ajoutez les exercices et leurs liens vidéo ici.</p><Button asChild className="mt-4"><Link href="/exercises">Ouvrir la bibliothèque →</Link></Button></div>
           </TabsContent>
 
           {/* Saved Sessions Tab */}

@@ -11,10 +11,10 @@ export default function ClientOnlyWrapper({ children }: { children: React.ReactN
 
   if (!mounted) {
     return (
-      <div className="volleyball-court relative mx-auto bg-muted/20 rounded-lg shadow-xl transition-all duration-200 flex items-center justify-center"
+      <div className="volleyball-court relative mx-auto max-w-full bg-muted/20 rounded-lg shadow-xl transition-all duration-200 flex items-center justify-center"
         style={{
-          width: 900,
-          height: 450,
+          width: '100%',
+          aspectRatio:'9 / 5',
         }}
       >
         <div className="text-muted-foreground text-lg font-medium animate-pulse">

@@ -35,12 +35,12 @@ interface PlayerDetailViewProps {
 
 export default function PlayerDetailView({ playerId }: PlayerDetailViewProps) {
   const [activeTab, setActiveTab] = useState("overview");
-
+  
   // Fetch player via Apollo Client
   const { data, loading, error } = useQuery(GET_PLAYER, {
     variables: { id: playerId }
   });
-
+  
   const player: PlayerType | undefined = data?.player;
 
   if (loading) {

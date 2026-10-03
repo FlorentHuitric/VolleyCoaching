@@ -83,7 +83,7 @@ const contractLevels = [
 export default function NewPlayerForm() {
   const router = useRouter();
   const { currentTeamId } = useTeam();
-
+  
   // Apollo Client mutations and queries
   const [createPlayerMutation] = useMutation(CREATE_PLAYER);
   const { data: playersData } = useQuery(GET_PLAYERS_BY_TEAM, {
@@ -96,7 +96,7 @@ export default function NewPlayerForm() {
   });
   const allPlayers = playersData?.playersByTeam || [];
   const currentTeamOrgId = teamData?.team?.orgId;
-
+  
   const [calendarMonth, setCalendarMonth] = useState<Date>(new Date(2000, 0));
   const [cropDialogOpen, setCropDialogOpen] = useState(false);
   const [tempImageUrl, setTempImageUrl] = useState<string>('');

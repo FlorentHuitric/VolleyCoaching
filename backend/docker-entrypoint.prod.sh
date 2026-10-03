@@ -18,6 +18,7 @@ npx prisma migrate deploy
 npx prisma db execute --file prisma/maintenance/20260928_training_plan.sql --schema prisma/schema.prisma
 
 npx prisma db execute --file prisma/maintenance/20260929_usb_rosters.sql --schema prisma/schema.prisma
+npx prisma db execute --file prisma/maintenance/20261003_assessment_protocols.sql --schema prisma/schema.prisma
 
 # Production never seeds automatically: initialization is an explicit maintenance action.
 

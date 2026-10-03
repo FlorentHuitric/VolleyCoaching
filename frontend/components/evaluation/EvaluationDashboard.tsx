@@ -36,15 +36,15 @@ import EvaluationHistory from './EvaluationHistory';
 
 export default function EvaluationDashboard() {
   const { currentTeamId } = useTeam();
-
+  
   // Fetch players via Apollo Client
   const { data, loading: playersLoading, refetch } = useQuery(GET_PLAYERS_BY_TEAM, {
     variables: { teamId: currentTeamId },
     skip: !currentTeamId
   });
-
+  
   const players: PlayerProfile[] = data?.playersByTeam || [];
-
+  
   const [activeTab, setActiveTab] = useState('new');
   const [selectedPlayer, setSelectedPlayer] = useState<PlayerProfile | null>(null);
   const [selectedBattery, setSelectedBattery] = useState<TestBattery | null>(null);
@@ -109,14 +109,15 @@ export default function EvaluationDashboard() {
             Centre d'Évaluation
           </h1>
           <p className="text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">
-            Évaluez vos joueurs avec des tests standardisés et suivez leur progression
+            Mesurez vos joueurs avec un protocole reproductible et un barème adapté à votre club.
           </p>
+          <Link href="/evaluation/protocoles" className="mt-4 inline-flex min-h-11 items-center rounded-xl bg-primary px-5 text-sm font-semibold text-primary-foreground">Ouvrir les protocoles et saisir un relevé →</Link>
         </div>
       </div>
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="new" className="flex items-center space-x-2">
             <Plus className="h-4 w-4" />
             <span>Nouvelle Évaluation</span>
@@ -125,45 +126,11 @@ export default function EvaluationDashboard() {
             <FileText className="h-4 w-4" />
             <span>Historique</span>
           </TabsTrigger>
-          <TabsTrigger value="batteries" className="flex items-center space-x-2">
-            <Target className="h-4 w-4" />
-            <span>Batteries de Tests</span>
-          </TabsTrigger>
+
         </TabsList>
 
-        {/* New Evaluation */}
-        <TabsContent value="new" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <Users className="h-5 w-5 text-blue-600" />
-                <span>Sélectionnez un joueur à évaluer</span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {playersLoading ? (
-                <div className="flex items-center justify-center py-12">
-                  <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
-                  <span className="ml-3 text-gray-600">Chargement des joueurs...</span>
-                </div>
-              ) : players.length === 0 ? (
-                <div className="text-center py-12 text-gray-500">
-                  <Users className="h-12 w-12 mx-auto mb-3 opacity-50" />
-                  <p>Aucun joueur disponible</p>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {players.map(player => (
-                    <PlayerEvaluationCard
-                      key={player.id}
-                      player={player}
-                      onStartEvaluation={handleStartEvaluation}
-                    />
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+        <TabsContent value="new" className="space-y-4">
+          <div className="rounded-xl border bg-card p-5"><h2 className="text-xl font-semibold">Un relevé vérifiable pour chaque joueur</h2><p className="mt-2 text-sm text-muted-foreground">Choisissez un joueur et un protocole, saisissez chaque essai, puis retrouvez les valeurs et le barème conservés dans l’historique.</p><Link href="/evaluation/protocoles" className="mt-4 inline-flex min-h-11 items-center rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground">Saisir un relevé →</Link></div>
         </TabsContent>
 
         {/* History */}
@@ -171,24 +138,6 @@ export default function EvaluationDashboard() {
           <EvaluationHistory players={players} />
         </TabsContent>
 
-        {/* Test Batteries */}
-        <TabsContent value="batteries" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <Target className="h-5 w-5 text-purple-600" />
-                <span>Batteries de Tests Disponibles</span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {TEST_BATTERIES.map(battery => (
-                  <TestBatteryCard key={battery.id} battery={battery} />
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
       </Tabs>
     </div>
   );

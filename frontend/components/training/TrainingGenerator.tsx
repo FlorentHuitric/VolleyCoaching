@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { PlayerType as PlayerProfile } from '@/types/player';
-import { TrainingSession, TrainingGeneratorParams, ExerciseDifficulty } from '@/types/exercises';
+import { TrainingSession, TrainingGeneratorParams, ExerciseDifficulty, TrainingExercise } from '@/types/exercises';
 import { generateTrainingSession } from '@/services/trainingService';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -11,15 +11,18 @@ import { Label } from '@/components/ui/label';
 import { Wand2, Users, Clock, Target, Zap } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { normalizeEquipment, normalizeSkill, skillLabels, stationCount, type TrainingFocusMode } from '@/services/trainingFocus';
 
 interface TrainingGeneratorProps {
   availablePlayers: PlayerProfile[];
   onGenerated: (session: TrainingSession) => void;
+  catalog: TrainingExercise[];
 }
 
 export default function TrainingGenerator({
   availablePlayers,
-  onGenerated
+  onGenerated,
+  catalog
 }: TrainingGeneratorProps) {
   const [selectedPlayerIds, setSelectedPlayerIds] = useState<string[]>([]);
   const [hoveredPlayerId, setHoveredPlayerId] = useState<string | null>(null);
@@ -31,10 +34,25 @@ export default function TrainingGenerator({
   const [includeGame, setIncludeGame] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [focusMode,setFocusMode]=useState<TrainingFocusMode>('weaknesses');
+  const [manualSkills,setManualSkills]=useState<string[]>([]);
+  const [availableEquipment,setAvailableEquipment]=useState<string[]>([]);
+  const equipmentInitialized=useRef(false);
+  const equipmentOptions=[...new Set(catalog.flatMap(exercise=>exercise.equipment.map(normalizeEquipment)))].sort();
+  const skillOptions=[...new Set(catalog.flatMap(exercise=>Object.keys(exercise.improvesSkills).map(normalizeSkill)))].filter(skill=>skillLabels[skill]).sort();
+  const selectedPlayers=availablePlayers.filter(player=>selectedPlayerIds.includes(player.id));
+  const compatibleCount=catalog.filter(exercise=>stationCount(selectedPlayers.length,exercise.minPlayers,exercise.maxPlayers)!==null&&exercise.equipment.every(item=>availableEquipment.includes(normalizeEquipment(item)))).length;
 
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  useEffect(()=>{
+    if(catalog.length&&!equipmentInitialized.current){
+      setAvailableEquipment([...new Set(catalog.flatMap(exercise=>exercise.equipment.map(normalizeEquipment)))]);
+      equipmentInitialized.current=true;
+    }
+  },[catalog]);
 
   // Helper to get rarity gradient classes based on rating
   const getRarityGradient = (rating: number) => {
@@ -69,28 +87,37 @@ export default function TrainingGenerator({
       return;
     }
 
+    if (catalog.length === 0) {
+      toast.warning('Ajoutez des exercices à la bibliothèque du club avant de préparer une séance.');
+      return;
+    }
+    if(focusMode==='manual'&&manualSkills.length===0){toast.warning('Choisissez au moins une compétence à travailler.');return}
     setGenerating(true);
-
-    // Simulate async generation (in real app, this could be an API call)
-    setTimeout(() => {
-      const selectedPlayers = availablePlayers.filter(p =>
-        selectedPlayerIds.includes(p.id)
-      );
-
+    try {
       const params: TrainingGeneratorParams = {
         playerIds: selectedPlayerIds,
         totalDuration: duration,
         difficulty,
         intensity,
+        focusMode,
+        focusAreas:manualSkills,
+        availableEquipment,
         includeWarmup,
         includeStretching,
         includeGame
       };
-
-      const session = generateTrainingSession(selectedPlayers, params);
+      const session = generateTrainingSession(selectedPlayers, params, catalog);
+      if (!session.phases.some(phase => phase.exercises.length > 0)) {
+        toast.warning('Aucun exercice de la bibliothèque ne correspond à ce groupe. Ajustez les filtres ou ajoutez des exercices.');
+        return;
+      }
+      if(session.duration<duration*0.65)toast.warning(`La bibliothèque couvre ${session.duration} min sur ${duration} demandées avec ces contraintes. Complétez les exercices du club.`);
       onGenerated(session);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Impossible de préparer la séance.');
+    } finally {
       setGenerating(false);
-    }, 500);
+    }
   };
 
   const difficulties: { value: ExerciseDifficulty; label: string; icon: string }[] = [
@@ -174,10 +201,13 @@ export default function TrainingGenerator({
                 };
 
                 return (
-                  <div
+                  <button
+                    type="button"
                     key={player.id}
+                    aria-pressed={isSelected}
+                    aria-label={`${player.firstName} ${player.lastName}`}
                     className={cn(
-                      'cursor-pointer text-xs py-2 px-2.5 rounded-md transition-all border font-medium inline-flex items-center justify-center',
+                      'cursor-pointer text-xs py-2 px-2.5 rounded-md transition-all border font-medium inline-flex items-center justify-center min-h-11 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary',
                       isSelected
                         ? 'text-white border-white ring-2 ring-white shadow-lg font-bold'
                         : 'bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600'
@@ -202,12 +232,27 @@ export default function TrainingGenerator({
                     onClick={() => togglePlayer(player.id)}
                   >
                     {player.firstName} {player.lastName.charAt(0)}.
-                  </div>
+                  </button>
                 );
               })
             )}
           </div>
         </div>
+
+        <section className="space-y-3 rounded-xl border border-border bg-background/50 p-4">
+          <div><h3 className="font-semibold">Objectif de la séance</h3><p className="text-sm text-muted-foreground">Les fiches des joueurs présents orientent la sélection. Le coach garde le dernier mot.</p></div>
+          <div className="grid gap-2 sm:grid-cols-3" role="group" aria-label="Objectif de la séance">
+            {([['weaknesses','Travailler les faiblesses'],['strengths','Renforcer les points forts'],['manual','Choisir un thème']] as const).map(([value,label])=><button key={value} type="button" aria-pressed={focusMode===value} onClick={()=>setFocusMode(value)} className={cn('min-h-11 rounded-lg border px-3 py-2 text-sm font-medium text-left transition-colors focus-visible:outline-2 focus-visible:outline-primary',focusMode===value?'border-primary bg-primary/10 text-foreground':'border-border hover:border-primary/60')}>{label}</button>)}
+          </div>
+          {focusMode==='manual'&&<div className="flex flex-wrap gap-2" role="group" aria-label="Compétences à travailler">{skillOptions.map(skill=><button key={skill} type="button" aria-pressed={manualSkills.includes(skill)} onClick={()=>setManualSkills(current=>current.includes(skill)?current.filter(item=>item!==skill):[...current,skill])} className={cn('min-h-10 rounded-full border px-3 text-sm transition-colors',manualSkills.includes(skill)?'border-primary bg-primary text-primary-foreground':'border-border hover:border-primary')}>{skillLabels[skill]}</button>)}</div>}
+          {selectedPlayers.some(player=>player.assessmentKind==='ESTIMATED')&&focusMode!=='manual'&&<p className="text-xs text-muted-foreground">Certaines notes de départ sont provisoires. Confirmez-les avant de vous fier aux priorités automatiques.</p>}
+        </section>
+
+        <section className="space-y-3 rounded-xl border border-border bg-background/50 p-4">
+          <div className="flex flex-wrap items-start justify-between gap-2"><div><h3 className="font-semibold">Matériel disponible</h3><p className="text-sm text-muted-foreground">Retirez ce que vous n’avez pas aujourd’hui : les exercices concernés seront exclus.</p></div><div className="flex gap-2"><Button type="button" variant="ghost" size="sm" onClick={()=>setAvailableEquipment(equipmentOptions)}>Tout</Button><Button type="button" variant="ghost" size="sm" onClick={()=>setAvailableEquipment([])}>Aucun</Button></div></div>
+          <div className="flex flex-wrap gap-2" role="group" aria-label="Matériel disponible">{equipmentOptions.map(item=><button key={item} type="button" aria-pressed={availableEquipment.includes(item)} onClick={()=>setAvailableEquipment(current=>current.includes(item)?current.filter(value=>value!==item):[...current,item])} className={cn('min-h-10 rounded-full border px-3 text-sm transition-colors',availableEquipment.includes(item)?'border-primary bg-primary/10':'border-border opacity-65')}>{item}</button>)}</div>
+          {selectedPlayers.length>0&&<p className="text-xs text-muted-foreground">{compatibleCount} exercice{compatibleCount>1?'s':''} compatible{compatibleCount>1?'s':''} avec {selectedPlayers.length} joueur{selectedPlayers.length>1?'s':''} et ce matériel. Les ateliers peuvent accueillir plusieurs groupes.</p>}
+        </section>
 
         {/* Duration */}
         <div>
@@ -215,18 +260,19 @@ export default function TrainingGenerator({
             <Clock className="h-4 w-4" />
             <span>Durée totale</span>
           </Label>
-          <div className="flex items-center space-x-4">
+          <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
             <Input
+              aria-label="Durée totale en minutes"
               type="number"
               min="30"
               max="180"
               step="15"
               value={duration}
               onChange={(e) => setDuration(Number(e.target.value))}
-              className="w-32 bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100"
+              className="w-full bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100"
             />
             <span className="text-sm text-gray-600 dark:text-gray-400">minutes</span>
-            <div className="flex space-x-2">
+            <div className="col-span-2 flex flex-wrap gap-2">
               {[60, 90, 120].map(mins => (
                 <Button
                   key={mins}
@@ -285,17 +331,17 @@ export default function TrainingGenerator({
                 variant={intensity === int.value ? 'default' : 'outline'}
                 size="sm"
                 onClick={() => setIntensity(int.value)}
-                className={`flex flex-col h-auto py-3 ${
+                className={`min-w-0 min-h-11 px-1 py-2 ${
                   intensity === int.value
                     ? 'bg-orange-600 text-white hover:bg-orange-700'
                     : 'bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
                 }`}
               >
                 <span className="font-semibold">{int.label}</span>
-                <span className="text-xs opacity-80 mt-1">{int.desc}</span>
               </Button>
             ))}
           </div>
+          <p className="mt-2 text-xs text-muted-foreground">{intensities.find(option=>option.value===intensity)?.desc}</p>
         </div>
 
         {/* Phase toggles */}
@@ -327,7 +373,7 @@ export default function TrainingGenerator({
         {/* Generate button */}
         <Button
           onClick={handleGenerate}
-          disabled={selectedPlayerIds.length === 0 || generating}
+          disabled={selectedPlayerIds.length === 0 || generating || catalog.length === 0}
           className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white py-6 text-lg font-semibold"
           size="lg"
         >

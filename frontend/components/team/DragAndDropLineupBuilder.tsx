@@ -1,8 +1,7 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, closestCenter, useDroppable, useDraggable } from '@dnd-kit/core';
-import { SortableContext, arrayMove } from '@dnd-kit/sortable';
+import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, pointerWithin, rectIntersection, useDroppable, useDraggable, PointerSensor, TouchSensor, KeyboardSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { PlayerProfile } from '@/types/player';
 import { VolleyballPosition } from '@/hooks/useCourtStore';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -11,6 +10,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Save, Users, Target } from 'lucide-react';
 import { getPositionColor, getPositionAbbreviation } from '@/utils/volleyballUtils';
+import { toast } from 'sonner';
 
 interface LineupPosition {
   courtPosition: number;
@@ -20,7 +20,7 @@ interface LineupPosition {
 
 interface DragAndDropLineupBuilderProps {
   availablePlayers: PlayerProfile[];
-  onSaveLineup: (lineup: LineupPosition[]) => void;
+  onSaveLineup: (lineup: LineupPosition[]) => void | Promise<void>;
   initialLineup?: LineupPosition[];
 }
 
@@ -53,7 +53,7 @@ const CourtPosition = ({
           <Avatar className="w-10 h-10">
             <AvatarImage src={player.avatar || undefined} />
             <AvatarFallback className="text-xs bg-blue-600 text-white font-bold">
-              {player.jerseyNumber}
+              {player.jerseyNumber ?? player.firstName?.[0] ?? '•'}
             </AvatarFallback>
           </Avatar>
           <span className="text-xs font-medium mt-1 truncate w-full text-center">
@@ -97,8 +97,9 @@ const DraggablePlayer = ({
       style={style}
       {...listeners}
       {...attributes}
+      aria-label={`Déplacer ${player.firstName} ${player.lastName} vers une position`}
       className={`
-        p-3 bg-white dark:bg-gray-800 rounded-lg border cursor-grab active:cursor-grabbing
+        p-3 bg-white dark:bg-gray-800 rounded-lg border cursor-grab active:cursor-grabbing touch-none
         transition-all duration-200 hover:shadow-md min-w-0 w-full
         ${dragging || isDragging ? 'opacity-50 shadow-lg' : 'opacity-100'}
       `}
@@ -112,14 +113,14 @@ const DraggablePlayer = ({
         </Avatar>
         <div className="flex-1 min-w-0 overflow-hidden">
           <p className="text-sm font-medium truncate">
-            {player.firstName || 'Prénom'} {player.lastName || 'Nom'}
+            {player.firstName} {player.lastName}
           </p>
           <div className="flex items-center space-x-2 mt-1">
             <Badge variant="secondary" className="text-xs flex-shrink-0">
               {getPositionAbbreviation(player.primaryPosition || 'OUTSIDE_HITTER')}
             </Badge>
             <span className="text-xs text-gray-500 flex-shrink-0">
-              #{player.jerseyNumber || 0}
+              {player.jerseyNumber == null ? 'Sans numéro' : `#${player.jerseyNumber}`}
             </span>
           </div>
         </div>
@@ -191,7 +192,7 @@ export default function DragAndDropLineupBuilder({
   onSaveLineup,
   initialLineup = []
 }: DragAndDropLineupBuilderProps) {
-  const [lineup, setLineup] = useState<LineupPosition[]>(initialLineup.length > 0 ? initialLineup : [
+  const [lineup, setLineup] = useState<LineupPosition[]>(initialLineup.length > 0 ? initialLineup.map(position=>({ ...position, player:availablePlayers.find(player=>player.id===position.player?.id) })) : [
     { courtPosition: 1, position: 'MIDDLE_BLOCKER' },  // Middle Blocker
     { courtPosition: 2, position: 'OPPOSITE' },        // Opposite
     { courtPosition: 3, position: 'OUTSIDE_HITTER' },  // Wing Smasher
@@ -201,6 +202,18 @@ export default function DragAndDropLineupBuilder({
   ]);
 
   const [activePlayer, setActivePlayer] = useState<PlayerProfile | null>(null);
+  const [selectedPlayerId, setSelectedPlayerId] = useState('');
+  const [saving, setSaving] = useState(false);
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 7 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 180, tolerance: 8 } }),
+    useSensor(KeyboardSensor)
+  );
+  const assign = useCallback((courtPosition: number, player?: PlayerProfile) => {
+    setLineup(previous => previous.map(position => position.courtPosition === courtPosition
+      ? { ...position, player }
+      : player?.id === position.player?.id ? { ...position, player: undefined } : position));
+  }, []);
 
   // Dependency Inversion: Use callbacks for flexible event handling
   const handleDragStart = useCallback((event: DragStartEvent) => {
@@ -221,24 +234,25 @@ export default function DragAndDropLineupBuilder({
       const player = active.data.current.player as PlayerProfile;
       const courtPosition = over.data.current.courtPosition as number;
 
-      setLineup(prev => prev.map(pos =>
-        pos.courtPosition === courtPosition
-          ? { ...pos, player }
-          : { ...pos, player: pos.player?.id === player.id ? undefined : pos.player }
-      ));
+      assign(courtPosition, player);
     }
-  }, []);
+  }, [assign]);
 
   const handleSave = useCallback(async () => {
-    try { await onSaveLineup(lineup); } catch { /* The parent displays the server error. */ }
-  }, [lineup, onSaveLineup]);
+    if (saving) return;
+    setSaving(true);
+    try { await onSaveLineup(lineup); toast.success('Composition enregistrée.'); }
+    catch (error) { toast.error(error instanceof Error ? error.message : 'Composition impossible à enregistrer.'); }
+    finally { setSaving(false); }
+  }, [lineup, onSaveLineup, saving]);
 
   const assignedPlayerIds = new Set(lineup.map(pos => pos.player?.id).filter(Boolean));
   const unassignedPlayers = availablePlayers.filter(player => !assignedPlayerIds.has(player.id));
 
   return (
     <DndContext
-      collisionDetection={closestCenter}
+      sensors={sensors}
+      collisionDetection={args => { const underPointer = pointerWithin(args); return underPointer.length ? underPointer : rectIntersection(args); }}
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
     >
@@ -252,6 +266,13 @@ export default function DragAndDropLineupBuilder({
             </CardTitle>
           </CardHeader>
           <CardContent>
+            <p className="text-sm text-muted-foreground mb-3">Sur téléphone, choisissez un joueur puis sa position. Vous pouvez aussi le glisser sur le terrain.</p>
+            <label className="block text-sm font-medium mb-3">Joueur à placer
+              <select aria-label="Joueur à placer" value={selectedPlayerId} onChange={event => setSelectedPlayerId(event.target.value)} className="mt-1 w-full min-h-11 rounded-lg border bg-background px-3">
+                <option value="">Choisir un joueur</option>
+                {availablePlayers.map(player => <option key={player.id} value={player.id}>{player.firstName} {player.lastName}</option>)}
+              </select>
+            </label>
             <div className="space-y-2 max-h-96 overflow-y-auto overflow-x-hidden">
               {unassignedPlayers.map(player => (
                 <DraggablePlayer key={player.id} player={player} />
@@ -276,29 +297,27 @@ export default function DragAndDropLineupBuilder({
               <Button
                 onClick={handleSave}
                 className="bg-green-600 hover:bg-green-700"
-                disabled={lineup.some(pos => !pos.player)}
+                disabled={saving || lineup.some(pos => !pos.player)}
               >
                 <Save className="h-4 w-4 mr-2" />
-                Sauvegarder
+                {saving ? 'Enregistrement…' : 'Sauvegarder'}
               </Button>
             </div>
           </CardHeader>
           <CardContent>
             <VolleyballCourt
               lineup={lineup}
-              onPositionUpdate={(courtPosition, player) => {
-                setLineup(prev => prev.map(pos =>
-                  pos.courtPosition === courtPosition ? { ...pos, player } : pos
-                ));
-              }}
+              onPositionUpdate={assign}
             />
-            <div className="mt-4 grid grid-cols-2 md:grid-cols-3 gap-2">
+            <div aria-label="Affectation des positions" className="mt-4 grid grid-cols-2 md:grid-cols-3 gap-2">
               {lineup.map(pos => (
-                <div key={pos.courtPosition} className="text-sm">
-                  <span className="font-medium">Position {pos.courtPosition}:</span>{' '}
-                  <span className="text-gray-600 dark:text-gray-400">
-                    {pos.player ? `${pos.player.firstName || 'Prénom'} ${pos.player.lastName || 'Nom'}` : 'Libre'}
-                  </span>
+                <div key={pos.courtPosition} className="rounded-lg border bg-card p-2 text-sm min-w-0">
+                  <span className="block font-semibold">Position {pos.courtPosition}</span>
+                  <span className="block truncate text-muted-foreground">{pos.player ? `${pos.player.firstName} ${pos.player.lastName}` : 'Libre'}</span>
+                  <div className="mt-2 flex gap-1">
+                    <Button type="button" variant="outline" size="sm" className="flex-1 min-h-10" disabled={!selectedPlayerId} onClick={() => { assign(pos.courtPosition, availablePlayers.find(player => player.id === selectedPlayerId)); setSelectedPlayerId(''); }}>Placer</Button>
+                    {pos.player && <Button type="button" variant="ghost" size="sm" className="min-h-10" aria-label={`Retirer le joueur en position ${pos.courtPosition}`} onClick={() => assign(pos.courtPosition)}>Retirer</Button>}
+                  </div>
                 </div>
               ))}
             </div>
@@ -308,7 +327,7 @@ export default function DragAndDropLineupBuilder({
 
       {/* Drag Overlay */}
       <DragOverlay>
-        {activePlayer && <DraggablePlayer player={activePlayer} isDragging />}
+        {activePlayer && <div className="rounded-xl border bg-card px-4 py-3 text-sm font-semibold shadow-xl">{activePlayer.firstName} {activePlayer.lastName}</div>}
       </DragOverlay>
     </DndContext>
   );
